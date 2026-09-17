@@ -3,6 +3,7 @@ export type Side = "long" | "short" | "decide";
 export type Bias = "long" | "short" | "none";
 export type DeskAction = "watch" | "reject" | "call_off" | "hold";
 export type CheckEvery = "15m" | "1h" | "4h";
+export type PaperStatus = "open" | "stopped" | "invalidated";
 
 export interface MarketSnapshot {
   symbol: string;
@@ -62,6 +63,25 @@ export interface WatchRow {
   updated_at: string;
 }
 
+export interface PaperRunRow {
+  id: string;
+  chat_id: number;
+  watch_id: string | null;
+  symbol: string;
+  horizon: Horizon;
+  side: string;
+  status: PaperStatus;
+  entry_price: number;
+  last_price: number | null;
+  pnl_pct: number | null;
+  thesis: JudgeReport;
+  invalidation: InvalidationBlob | null;
+  opened_at: string;
+  closed_at: string | null;
+  close_reason: string | null;
+  updated_at: string;
+}
+
 export interface UserRow {
   chat_id: number;
   alerts_on: boolean;
@@ -83,6 +103,7 @@ export interface Conversation {
   symbol?: string;
   lastReport?: JudgeReport;
   lastWatchId?: string;
+  lastPaperId?: string;
 }
 
 export interface DebateBundle {

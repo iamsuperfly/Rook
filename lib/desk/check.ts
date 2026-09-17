@@ -1,10 +1,14 @@
 import { crossedInvalidation, moveVsSnapshotPct, scoutSymbol } from "@/lib/bitget/scout";
+import { agentHubTicker } from "@/lib/bitget/agent-market";
 import { dbConfigured } from "@/lib/db/supabase";
+import { listOpenPaperRuns, updatePaperRun } from "@/lib/db/paper";
 import { getUser, getWatch, listActiveWatches, updateWatchSnapshot } from "@/lib/db/watches";
 import { sendMessage } from "@/lib/telegram/bot";
 import { alertText } from "@/lib/telegram/format";
-import { watchAlertKeyboard } from "@/lib/telegram/keyboards";
+import { paperCard } from "@/lib/telegram/paper-format";
+import { paperKeyboard, watchAlertKeyboard } from "@/lib/telegram/keyboards";
 import type { JudgeReport, Side, WatchRow } from "@/lib/types";
+import { scorePaper } from "./paper";
 import { runDebate, shouldRewriteJudge } from "./debate";
 
 export interface CheckResult {
@@ -19,6 +23,12 @@ export interface CheckResult {
 
 function thesisSnapshotLast(watch: WatchRow): number | null {
   return watch.last_price;
+}
+
+async function lastPrice(symbol: string): Promise<number> {
+  const hub = await agentHubTicker(symbol);
+  if (hub && Number.isFinite(hub.last)) return hub.last;
+  return (await scoutSymbol(symbol)).last;
 }
 
 export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Promise<CheckResult> {
@@ -106,6 +116,42 @@ export async function notifyCheck(watch: WatchRow, result: CheckResult, report?:
   );
 }
 
+async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
+  const runs = await listOpenPaperRuns(chatId);
+  const out: CheckResult[] = [];
+  for (const run of runs) {
+    try {
+      const last = await lastPrice(run.symbol);
+      const scored = scorePaper(run, last);
+      const closed = scored.status !== "open";
+      await updatePaperRun(run.id, {
+        last_price: last,
+        pnl_pct: scored.pnl_pct,
+        status: scored.status,
+        close_reason: scored.close_reason,
+        closed_at: closed ? new Date().toISOString() : run.closed_at,
+      });
+      const silent = !closed;
+      if (!silent) {
+        const fresh = { ...run, last_price: last, pnl_pct: scored.pnl_pct, status: scored.status, close_reason: scored.close_reason };
+        await sendMessage(run.chat_id, paperCard(fresh), { reply_markup: paperKeyboard(run.id) });
+      }
+      out.push({
+        id: run.id,
+        symbol: run.symbol,
+        chatId: run.chat_id,
+        silent,
+        action: scored.status,
+        last,
+        reason: scored.close_reason ?? "paper_scored",
+      });
+    } catch (err) {
+      console.error("[check] paper failed", run.id, err);
+    }
+  }
+  return out;
+}
+
 export async function runCheckPass(opts?: { chatId?: number; force?: boolean }): Promise<CheckResult[]> {
   if (!dbConfigured()) throw new Error("supabase_unconfigured");
   const watches = await listActiveWatches(opts?.chatId);
@@ -135,5 +181,6 @@ export async function runCheckPass(opts?: { chatId?: number; force?: boolean }):
       });
     }
   }
-  return out;
+  const paper = await scoreOpenPaper(opts?.chatId);
+  return out.concat(paper);
 }
