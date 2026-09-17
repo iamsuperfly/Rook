@@ -1,6 +1,7 @@
 export const BTN = {
   newThesis: "NEW THESIS",
   myWatches: "MY WATCHES",
+  myPaper: "MY PAPER",
   lastReport: "LAST REPORT",
   checkNow: "CHECK NOW",
   settings: "SETTINGS",
@@ -21,11 +22,13 @@ export const BTN = {
   bear: "BEAR CASE",
   wrong: "I AM WRONG IF",
   watch: "WATCH THIS",
+  callLive: "CALL LIVE",
   reject: "REJECT",
   refresh: "REFRESH",
   openReport: "OPEN REPORT",
   callOff: "CALL OFF",
   keep: "KEEP WATCHING",
+  stopPaper: "STOP PAPER",
   alerts: "ALERTS ON/OFF",
   interval: "CHECK EVERY 15m / 1h / 4h",
 } as const;
@@ -35,6 +38,7 @@ export type BtnLabel = (typeof BTN)[keyof typeof BTN];
 const MAIN_LABELS = new Set<string>([
   BTN.newThesis,
   BTN.myWatches,
+  BTN.myPaper,
   BTN.lastReport,
   BTN.checkNow,
   BTN.settings,
@@ -50,8 +54,9 @@ export function mainReplyKeyboard() {
   return {
     keyboard: [
       [{ text: BTN.newThesis }, { text: BTN.myWatches }],
-      [{ text: BTN.lastReport }, { text: BTN.checkNow }],
-      [{ text: BTN.settings }, { text: BTN.help }],
+      [{ text: BTN.myPaper }, { text: BTN.checkNow }],
+      [{ text: BTN.lastReport }, { text: BTN.settings }],
+      [{ text: BTN.help }],
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -72,6 +77,7 @@ export const CB = {
   market: (m: string) => `th:m:${m}`,
   card: (k: string) => `card:${k}`,
   watchAct: (act: string, id: string) => `w:${act}:${id}`,
+  paperAct: (act: string, id: string) => `p:${act}:${id}`,
   setAlerts: "set:alerts",
   setEvery: "set:every",
 } as const;
@@ -120,8 +126,9 @@ export function thesisKeyboard() {
     [{ text: BTN.wrong, callback_data: CB.card("wrong") }],
     [
       { text: BTN.watch, callback_data: CB.card("watch") },
-      { text: BTN.reject, callback_data: CB.card("reject") },
+      { text: BTN.callLive, callback_data: CB.card("live") },
     ],
+    [{ text: BTN.reject, callback_data: CB.card("reject") }],
     [{ text: BTN.refresh, callback_data: CB.card("refresh") }],
     [{ text: BTN.mainMenu, callback_data: CB.menu }],
   ]);
@@ -133,7 +140,15 @@ export function watchAlertKeyboard(watchId: string) {
       { text: BTN.openReport, callback_data: CB.watchAct("open", watchId) },
       { text: BTN.callOff, callback_data: CB.watchAct("off", watchId) },
     ],
+    [{ text: BTN.callLive, callback_data: CB.watchAct("live", watchId) }],
     [{ text: BTN.keep, callback_data: CB.watchAct("keep", watchId) }],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
+}
+
+export function paperKeyboard(id: string) {
+  return inline([
+    [{ text: BTN.stopPaper, callback_data: CB.paperAct("stop", id) }],
     [{ text: BTN.mainMenu, callback_data: CB.menu }],
   ]);
 }
@@ -150,6 +165,15 @@ export function watchesListKeyboard(ids: string[]) {
   const rows = ids.slice(0, 8).map((id, i) => [
     { text: `${BTN.openReport} #${i + 1}`, callback_data: CB.watchAct("open", id) },
     { text: BTN.callOff, callback_data: CB.watchAct("off", id) },
+  ]);
+  rows.push([{ text: BTN.mainMenu, callback_data: CB.menu }]);
+  return inline(rows);
+}
+
+export function paperListKeyboard(ids: string[]) {
+  const rows = ids.slice(0, 8).map((id, i) => [
+    { text: `PAPER #${i + 1}`, callback_data: CB.paperAct("open", id) },
+    { text: BTN.stopPaper, callback_data: CB.paperAct("stop", id) },
   ]);
   rows.push([{ text: BTN.mainMenu, callback_data: CB.menu }]);
   return inline(rows);
