@@ -38,6 +38,7 @@ import {
   watchAlertKeyboard,
   watchesListKeyboard,
 } from "./keyboards";
+import { callLiveFromReport, callLiveFromWatch, handlePaperAct, showPaper } from "./paper-handlers";
 import { getConv, patchConv, setConv } from "./state";
 
 function isHorizon(v: string): v is Horizon {
@@ -130,16 +131,20 @@ async function handleText(msg: TgMessage): Promise<void> {
     await showWatches(chatId);
     return;
   }
+  if (text === BTN.myPaper || text === "/paper") {
+    await showPaper(chatId);
+    return;
+  }
   if (text === BTN.lastReport || text === "/last") {
     await showLast(chatId);
     return;
   }
   if (text === BTN.checkNow || text === "/check") {
-    await sendMessage(chatId, "Running deterministic check on active watches…");
+    await sendMessage(chatId, "Running check on watches + paper…");
     try {
       const results = await runCheckPass({ chatId, force: true });
       if (!results.length) {
-        await sendMessage(chatId, "No active watches to check.");
+        await sendMessage(chatId, "No active watches or paper runs to check.");
         return;
       }
       const lines = results.map((r) => `${r.symbol}: ${r.silent ? "silent price update" : r.action} (${r.reason})`);
@@ -256,6 +261,14 @@ async function handleCallback(cb: TgCallback): Promise<void> {
     return;
   }
 
+  if (data.startsWith("p:")) {
+    const parts = data.split(":");
+    const act = parts[1];
+    const id = parts.slice(2).join(":");
+    await handlePaperAct(chatId, act, id);
+    return;
+  }
+
   if (data === CB.setAlerts) {
     const user = await safeDb(async () => {
       await ensureUser(chatId);
@@ -308,6 +321,14 @@ async function handleCard(chatId: number, kind: string): Promise<void> {
     await runThesis(chatId, conv.symbol);
     return;
   }
+  if (kind === "live") {
+    try {
+      await callLiveFromReport(chatId, report, conv.side ?? report.bias, conv.lastWatchId);
+    } catch (err) {
+      await sendMessage(chatId, `CALL LIVE failed: ${err instanceof Error ? err.message : "unknown"}`);
+    }
+    return;
+  }
   if (kind === "watch") {
     if (!dbConfigured()) {
       await sendMessage(chatId, "Supabase is not configured yet — cannot persist the watch.");
@@ -349,6 +370,10 @@ async function handleCard(chatId: number, kind: string): Promise<void> {
 async function handleWatchAct(chatId: number, act: string, id: string): Promise<void> {
   if (!dbConfigured()) {
     await sendMessage(chatId, "Database not configured.");
+    return;
+  }
+  if (act === "live") {
+    await callLiveFromWatch(chatId, id);
     return;
   }
   const watch = await getWatch(id);
