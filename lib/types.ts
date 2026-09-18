@@ -96,6 +96,11 @@ export type ConvStep =
   | "await_market"
   | "await_custom_symbol";
 
+export interface PendingPaper {
+  report: JudgeReport;
+  watchId: string | null;
+}
+
 export interface Conversation {
   step: ConvStep;
   horizon?: Horizon;
@@ -104,6 +109,7 @@ export interface Conversation {
   lastReport?: JudgeReport;
   lastWatchId?: string;
   lastPaperId?: string;
+  pendingPaper?: PendingPaper;
 }
 
 export interface DebateBundle {
