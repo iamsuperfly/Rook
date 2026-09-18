@@ -64,7 +64,7 @@ export function crossedInvalidation(
   const s = side.toLowerCase();
   if (s === "long") return last <= invalidationPrice;
   if (s === "short") return last >= invalidationPrice;
-  return last <= invalidationPrice || last >= invalidationPrice;
+  return false;
 }
 
 export function moveVsSnapshotPct(last: number, snapshotLast: number | null | undefined): number | null {
