@@ -1,6 +1,18 @@
-import type { Horizon, InvalidationBlob, JudgeReport, PaperRunRow } from "@/lib/types";
+import type { Horizon, InvalidationBlob, JudgeReport, PaperRunRow, PaperStatus } from "@/lib/types";
+import { MAX_OPEN_PAPER, PaperLimitError, isPaperDir } from "@/lib/desk/paper";
 import { getServiceDb } from "./supabase";
 import { ensureUser } from "./watches";
+
+export async function countOpenPaperRuns(chatId: number): Promise<number> {
+  const db = getServiceDb();
+  const { count, error } = await db
+    .from("paper_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("chat_id", chatId)
+    .eq("status", "open");
+  if (error) throw error;
+  return count ?? 0;
+}
 
 export async function openPaperRun(opts: {
   chatId: number;
@@ -11,7 +23,13 @@ export async function openPaperRun(opts: {
   entry: number;
   report: JudgeReport;
 }): Promise<PaperRunRow> {
+  if (!isPaperDir(opts.side)) {
+    throw new Error("paper_side_required");
+  }
   await ensureUser(opts.chatId);
+  const openCount = await countOpenPaperRuns(opts.chatId);
+  if (openCount >= MAX_OPEN_PAPER) throw new PaperLimitError();
+
   const db = getServiceDb();
   const inv: InvalidationBlob = {
     price: opts.report.invalidation_price,
@@ -35,7 +53,11 @@ export async function openPaperRun(opts: {
     })
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) {
+    const msg = error.message ?? "";
+    if (msg.includes("paper_open_limit")) throw new PaperLimitError();
+    throw error;
+  }
   return data as PaperRunRow;
 }
 
@@ -53,6 +75,19 @@ export async function listOpenPaperRuns(chatId?: number): Promise<PaperRunRow[]>
   let q = db.from("paper_runs").select("*").eq("status", "open").order("updated_at", { ascending: false });
   if (chatId !== undefined) q = q.eq("chat_id", chatId);
   const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as PaperRunRow[];
+}
+
+export async function listClosedPaperRuns(chatId: number): Promise<PaperRunRow[]> {
+  const db = getServiceDb();
+  const { data, error } = await db
+    .from("paper_runs")
+    .select("*")
+    .eq("chat_id", chatId)
+    .neq("status", "open")
+    .order("updated_at", { ascending: false })
+    .limit(30);
   if (error) throw error;
   return (data ?? []) as PaperRunRow[];
 }
@@ -78,3 +113,5 @@ export async function updatePaperRun(
   if (error) throw error;
   return data as PaperRunRow;
 }
+
+export type { PaperStatus };
