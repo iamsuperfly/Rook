@@ -2,6 +2,7 @@ export const BTN = {
   newThesis: "NEW THESIS",
   myWatches: "MY WATCHES",
   myPaper: "MY PAPER",
+  records: "RECORDS",
   lastReport: "LAST REPORT",
   checkNow: "CHECK NOW",
   settings: "SETTINGS",
@@ -39,6 +40,7 @@ const MAIN_LABELS = new Set<string>([
   BTN.newThesis,
   BTN.myWatches,
   BTN.myPaper,
+  BTN.records,
   BTN.lastReport,
   BTN.checkNow,
   BTN.settings,
@@ -54,9 +56,9 @@ export function mainReplyKeyboard() {
   return {
     keyboard: [
       [{ text: BTN.newThesis }, { text: BTN.myWatches }],
-      [{ text: BTN.myPaper }, { text: BTN.checkNow }],
-      [{ text: BTN.lastReport }, { text: BTN.settings }],
-      [{ text: BTN.help }],
+      [{ text: BTN.myPaper }, { text: BTN.records }],
+      [{ text: BTN.checkNow }, { text: BTN.lastReport }],
+      [{ text: BTN.settings }, { text: BTN.help }],
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -78,6 +80,9 @@ export const CB = {
   card: (k: string) => `card:${k}`,
   watchAct: (act: string, id: string) => `w:${act}:${id}`,
   paperAct: (act: string, id: string) => `p:${act}:${id}`,
+  paperDir: (s: string) => `pd:${s}`,
+  records: "nav:records",
+  myPaper: "nav:paper",
   setAlerts: "set:alerts",
   setEvery: "set:every",
 } as const;
@@ -149,6 +154,31 @@ export function watchAlertKeyboard(watchId: string) {
 export function paperKeyboard(id: string) {
   return inline([
     [{ text: BTN.stopPaper, callback_data: CB.paperAct("stop", id) }],
+    [{ text: BTN.myPaper, callback_data: CB.myPaper }],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
+}
+
+export function paperBiasKeyboard() {
+  return inline([
+    [
+      { text: BTN.long, callback_data: CB.paperDir("long") },
+      { text: BTN.short, callback_data: CB.paperDir("short") },
+    ],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
+}
+
+export function paperLimitKeyboard() {
+  return inline([
+    [{ text: BTN.myPaper, callback_data: CB.myPaper }],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
+}
+
+export function openPaperEmptyKeyboard() {
+  return inline([
+    [{ text: BTN.records, callback_data: CB.records }],
     [{ text: BTN.mainMenu, callback_data: CB.menu }],
   ]);
 }
@@ -175,6 +205,16 @@ export function paperListKeyboard(ids: string[]) {
     { text: `PAPER #${i + 1}`, callback_data: CB.paperAct("open", id) },
     { text: BTN.stopPaper, callback_data: CB.paperAct("stop", id) },
   ]);
+  rows.push([{ text: BTN.records, callback_data: CB.records }]);
+  rows.push([{ text: BTN.mainMenu, callback_data: CB.menu }]);
+  return inline(rows);
+}
+
+export function recordsListKeyboard(ids: string[]) {
+  const rows = ids.slice(0, 8).map((id, i) => [
+    { text: `RECORD #${i + 1}`, callback_data: CB.paperAct("open", id) },
+  ]);
+  rows.push([{ text: BTN.myPaper, callback_data: CB.myPaper }]);
   rows.push([{ text: BTN.mainMenu, callback_data: CB.menu }]);
   return inline(rows);
 }
