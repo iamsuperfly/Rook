@@ -8,7 +8,7 @@ describe("paperPnlPct", () => {
   it("short profits when last falls", () => {
     expect(paperPnlPct("short", 100, 90)).toBeCloseTo(10);
   });
-  it("decide treated as long", () => {
-    expect(paperPnlPct("decide", 50, 55)).toBeCloseTo(10);
+  it("does not score legacy decide rows", () => {
+    expect(paperPnlPct("decide", 50, 55)).toBeNull();
   });
 });
