@@ -5,7 +5,7 @@ export function esc(s: string): string {
   return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
 }
 
-function bullets(items: string[], empty = "—"): string {
+function bullets(items: string[], empty = "\u2014"): string {
   if (!items.length) return empty;
   return items.map((x) => `• ${esc(x)}`).join("\n");
 }
@@ -28,7 +28,7 @@ export function footer(): string {
 
 export function welcomeText(): string {
   return [
-    "<b>ROOK</b> — adversarial desk for Bitget tokenized US names / USDT markets.",
+    "<b>ROOK</b> \u2014 adversarial desk for Bitget tokenized US names / USDT markets.",
     "",
     "I build a thesis, attack it, write explicit invalidation, then watch after hours.",
     "I <b>never</b> place an order. You call it off.",
@@ -41,14 +41,14 @@ export function welcomeText(): string {
 export function helpText(): string {
   return [
     "<b>HOW ROOK WORKS</b>",
-    "1. NEW THESIS → horizon → side → market",
+    "1. NEW THESIS \u2192 horizon \u2192 side \u2192 market",
     "2. Scout pulls live Bitget public numbers (no LLM prices)",
-    "3. Bull and Bear argue. Judge writes invalidation + JSON",
+    "3. Bull and Bear argue. Judge writes the thesis and a hard invalidation price",
     "4. WATCH THIS monitors the thesis. CALL LIVE opens a directional paper call",
-    "5. MY PAPER = open calls (max 10). RECORDS = stopped / invalidated",
-    "6. If invalidation is crossed I tell you. I never place a Bitget order",
+    "5. MY PAPER is open calls (max 10). RECORDS is stopped and invalidated calls",
+    "6. If the invalidation price is crossed I tell you. I never place a Bitget order",
     "",
-    "<b>Bitget AI Base Camp S2</b> — track: AI Trading Desk (research workbench / decision stress testing). No execution.",
+    "<b>Bitget AI Base Camp S2</b> \u2014 track: AI Trading Desk (research workbench / decision stress testing). No execution.",
     "",
     "Bare tickers like NVDA map to NVDAUSDT, then RNVDAUSDT (Bitget rToken style) if needed.",
     footer(),
@@ -67,37 +67,37 @@ export function snapshotLine(s: MarketSnapshot): string {
 export function thesisCard(report: JudgeReport, snapshot?: MarketSnapshot, prevConf?: number | null): string {
   const conf =
     prevConf !== null && prevConf !== undefined && prevConf !== report.confidence
-      ? `${prevConf} → ${report.confidence}`
+      ? `${prevConf} \u2192 ${report.confidence}`
       : String(report.confidence);
   const lines = [
     `<b>ROOK REPORT // ${esc(report.symbol)}</b>`,
-    `${esc(report.horizon)} · bias <b>${esc(report.bias.toUpperCase())}</b> · conf <b>${esc(conf)}</b> · evq ${report.evidence_quality}`,
+    `${esc(report.horizon)} \u00b7 bias <b>${esc(report.bias.toUpperCase())}</b> \u00b7 confidence <b>${esc(conf)}</b> \u00b7 evidence ${report.evidence_quality}`,
     `action <b>${esc(report.action)}</b>`,
     snapshot ? snapshotLine(snapshot) : "",
     "",
     `<b>STRATEGY</b>`,
-    esc(report.strategy || report.reason || "—"),
+    esc(report.strategy || report.reason || "\u2014"),
     "",
     `<b>INVALIDATION</b> ${fmtNum(report.invalidation_price)}`,
-    esc(report.invalidation_note || "—"),
+    esc(report.invalidation_note || "\u2014"),
     "",
     `<b>WHY</b>`,
-    esc(report.reason || "—"),
+    esc(report.reason || "\u2014"),
   ];
   if (report.parse_error && report.raw_text) {
-    lines.push("", "<b>RAW (parse_error)</b>", `<pre>${esc(report.raw_text.slice(0, 1500))}</pre>`);
+    lines.push("", "<b>UNPARSED JUDGE TEXT</b>", `<pre>${esc(report.raw_text.slice(0, 1500))}</pre>`);
   }
   lines.push(footer());
   return lines.filter((x, i, a) => x !== "" || a[i - 1] !== "").join("\n");
 }
 
 export function sectionCard(title: string, body: string): string {
-  return `<b>${esc(title)}</b>\n${esc(body || "—")}${footer()}`;
+  return `<b>${esc(title)}</b>\n${esc(body || "\u2014")}${footer()}`;
 }
 
 export function wrongCard(report: JudgeReport): string {
   return [
-    `<b>I AM WRONG IF — ${esc(report.symbol)}</b>`,
+    `<b>I AM WRONG IF \u2014 ${esc(report.symbol)}</b>`,
     bullets(report.i_am_wrong_if),
     "",
     `<b>RISKS</b>`,
@@ -120,8 +120,8 @@ export function watchesText(rows: WatchRow[]): string {
       const dist = distancePct(Number(w.last_price ?? 0), inv);
       return [
         `<b>${i + 1}. ${esc(w.symbol)}</b> ${esc(w.horizon)} ${esc(String(w.side))}`,
-        `conf ${w.last_confidence ?? "?"} · action ${esc(w.last_action ?? "?")} · last ${fmtNum(Number(w.last_price))}`,
-        `invalidation ${fmtNum(inv)} · dist ${fmtPct(dist)}`,
+        `confidence ${w.last_confidence ?? "?"} \u00b7 action ${esc(w.last_action ?? "?")} \u00b7 last ${fmtNum(Number(w.last_price))}`,
+        `invalidation ${fmtNum(inv)} \u00b7 dist ${fmtPct(dist)}`,
       ].join("\n");
     })
     .join("\n\n");
@@ -133,7 +133,7 @@ export function settingsText(alertsOn: boolean, every: string): string {
     "<b>SETTINGS</b>",
     `Alerts: <b>${alertsOn ? "ON" : "OFF"}</b>`,
     `Preferred check cadence: <b>${esc(every)}</b>`,
-    "Cron is still external (cron-job.org → GET /api/check). This only stores your preference.",
+    "This is your preference for how often Rook should re-read open watches.",
     footer(),
   ].join("\n");
 }
@@ -149,12 +149,12 @@ export function alertText(opts: {
 }): string {
   const conf =
     opts.prevConf !== null && opts.prevConf !== opts.nextConf
-      ? `${opts.prevConf} → ${opts.nextConf}`
+      ? `${opts.prevConf} \u2192 ${opts.nextConf}`
       : String(opts.nextConf);
   return [
     `<b>WATCH ALERT // ${esc(opts.symbol)}</b>`,
-    `action <b>${esc(opts.action)}</b> · conf <b>${esc(conf)}</b>`,
-    `last ${fmtNum(opts.last)} · invalidation ${fmtNum(opts.inv)}`,
+    `action <b>${esc(opts.action)}</b> \u00b7 confidence <b>${esc(conf)}</b>`,
+    `last ${fmtNum(opts.last)} \u00b7 invalidation ${fmtNum(opts.inv)}`,
     esc(opts.reason),
     footer(),
   ].join("\n");
