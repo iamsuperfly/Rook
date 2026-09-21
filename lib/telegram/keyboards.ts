@@ -61,9 +61,35 @@ export function mainReplyKeyboard() {
       [{ text: BTN.settings }, { text: BTN.help }],
     ],
     resize_keyboard: true,
-    is_persistent: true,
+    is_persistent: false,
     input_field_placeholder: "Use the buttons — Rook never places an order",
   };
+}
+
+export type DeskTextRoute =
+  | "home"
+  | "help"
+  | "settings"
+  | "thesis"
+  | "watches"
+  | "paper"
+  | "records"
+  | "last"
+  | "check"
+  | "other";
+
+export function deskTextRoute(text: string): DeskTextRoute {
+  const t = text.trim();
+  if (t === "/start" || t === BTN.mainMenu || t === "/menu") return "home";
+  if (t === "/help" || t === BTN.help) return "help";
+  if (t === "/settings" || t === BTN.settings) return "settings";
+  if (t === "/thesis" || t === BTN.newThesis) return "thesis";
+  if (t === BTN.myWatches || t === "/watches") return "watches";
+  if (t === BTN.myPaper || t === "/paper") return "paper";
+  if (t === BTN.records || t === "/records") return "records";
+  if (t === BTN.lastReport || t === "/last") return "last";
+  if (t === BTN.checkNow || t === "/check") return "check";
+  return "other";
 }
 
 function inline(rows: Array<Array<{ text: string; callback_data: string }>>) {
@@ -217,4 +243,12 @@ export function recordsListKeyboard(ids: string[]) {
   rows.push([{ text: BTN.myPaper, callback_data: CB.myPaper }]);
   rows.push([{ text: BTN.mainMenu, callback_data: CB.menu }]);
   return inline(rows);
+}
+
+export function recordDetailKeyboard() {
+  return inline([
+    [{ text: BTN.records, callback_data: CB.records }],
+    [{ text: BTN.myPaper, callback_data: CB.myPaper }],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
 }
