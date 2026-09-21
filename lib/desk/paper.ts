@@ -62,14 +62,30 @@ export function isWinLossEligible(run: Pick<PaperRunRow, "side" | "status" | "pn
   return typeof run.pnl_pct === "number" && Number.isFinite(Number(run.pnl_pct));
 }
 
-export function recordsStats(rows: PaperRunRow[]): { closed: number; wins: number; losses: number } {
+export function recordsStats(rows: PaperRunRow[]): {
+  closed: number;
+  wins: number;
+  losses: number;
+  avgWinner: number | null;
+  avgLoser: number | null;
+} {
   const closed = rows.filter((r) => r.status !== "open");
   const scored = closed.filter(isWinLossEligible);
+  const wins = scored.filter((r) => Number(r.pnl_pct) > 0);
+  const losses = scored.filter((r) => Number(r.pnl_pct) < 0);
+  const avg = (list: typeof scored) =>
+    list.length ? list.reduce((s, r) => s + Number(r.pnl_pct), 0) / list.length : null;
   return {
     closed: closed.length,
-    wins: scored.filter((r) => Number(r.pnl_pct) > 0).length,
-    losses: scored.filter((r) => Number(r.pnl_pct) < 0).length,
+    wins: wins.length,
+    losses: losses.length,
+    avgWinner: avg(wins),
+    avgLoser: avg(losses),
   };
+}
+
+export function canOpenAnotherPaper(openCount: number): boolean {
+  return openCount >= 0 && openCount < MAX_OPEN_PAPER;
 }
 
 export class PaperLimitError extends Error {
