@@ -1,4 +1,4 @@
-import { crossedInvalidation, moveVsSnapshotPct, scoutSymbol } from "@/lib/bitget/scout";
+import { moveVsSnapshotPct, scoutSymbol } from "@/lib/bitget/scout";
 import { agentHubTicker } from "@/lib/bitget/agent-market";
 import { dbConfigured } from "@/lib/db/supabase";
 import { listOpenPaperRuns, updatePaperRun } from "@/lib/db/paper";
@@ -10,6 +10,7 @@ import { paperKeyboard, watchAlertKeyboard } from "@/lib/telegram/keyboards";
 import type { JudgeReport, Side, WatchRow } from "@/lib/types";
 import { scorePaper } from "./paper";
 import { runDebate, shouldRewriteJudge } from "./debate";
+import { alertInvalidationPrice, storedInvalidationPrice, watchCrossed } from "./watch-eval";
 
 export interface CheckResult {
   id: string;
@@ -19,6 +20,7 @@ export interface CheckResult {
   action: string;
   last: number;
   reason: string;
+  evaluatedInv?: number | null;
 }
 
 function thesisSnapshotLast(watch: WatchRow): number | null {
@@ -33,9 +35,8 @@ async function lastPrice(symbol: string): Promise<number> {
 
 export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Promise<CheckResult> {
   const snap = await scoutSymbol(watch.symbol);
-  const inv = watch.invalidation?.price ?? watch.last_thesis?.invalidation_price ?? null;
-  const sideHint = watch.side || watch.last_thesis?.bias || "none";
-  const crossed = crossedInvalidation(sideHint, snap.last, inv);
+  const storedInv = storedInvalidationPrice(watch);
+  const crossed = watchCrossed(watch, snap.last);
   const move = moveVsSnapshotPct(snap.last, thesisSnapshotLast(watch));
   const rewrite = shouldRewriteJudge({ force: forceRewrite, crossed, moveAbsPct: move });
 
@@ -49,6 +50,7 @@ export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Prom
       action: watch.last_action ?? "hold",
       last: snap.last,
       reason: "price_updated",
+      evaluatedInv: storedInv,
     };
   }
 
@@ -67,6 +69,12 @@ export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Prom
   const drop = prevConf !== null && prevConf !== undefined ? prevConf - report.confidence : 0;
   let action = report.action;
   if (crossed) action = "call_off";
+
+  const evaluatedInv = alertInvalidationPrice({
+    crossed,
+    storedInv,
+    rewrittenInv: report.invalidation_price,
+  });
 
   const active = action !== "call_off" && action !== "reject";
   await updateWatchSnapshot(watch.id, {
@@ -91,8 +99,9 @@ export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Prom
     silent: !shouldAlert,
     action,
     last: snap.last,
+    evaluatedInv,
     reason: crossed
-      ? `Invalidation crossed at ${snap.last} vs ${inv}`
+      ? `Invalidation crossed at ${snap.last} vs ${storedInv}`
       : drop >= 15
         ? `Confidence dropped ${prevConf} → ${report.confidence}`
         : report.reason || action,
@@ -109,7 +118,10 @@ export async function notifyCheck(watch: WatchRow, result: CheckResult, report?:
       nextConf: report?.confidence ?? watch.last_confidence ?? 0,
       action: result.action,
       last: result.last,
-      inv: report?.invalidation_price ?? watch.invalidation?.price ?? null,
+      inv:
+        result.evaluatedInv !== undefined
+          ? result.evaluatedInv
+          : storedInvalidationPrice(watch),
       reason: result.reason,
     }),
     { reply_markup: watchAlertKeyboard(watch.id) },

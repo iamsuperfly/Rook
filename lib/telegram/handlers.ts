@@ -37,8 +37,16 @@ import {
   thesisKeyboard,
   watchAlertKeyboard,
   watchesListKeyboard,
+  deskTextRoute,
 } from "./keyboards";
-import { callLiveFromReport, callLiveFromWatch, handlePaperAct, showPaper } from "./paper-handlers";
+import {
+  callLiveFromReport,
+  callLiveFromWatch,
+  handlePaperAct,
+  handlePaperDir,
+  showPaper,
+  showRecords,
+} from "./paper-handlers";
 import { getConv, patchConv, setConv } from "./state";
 
 function isHorizon(v: string): v is Horizon {
@@ -60,7 +68,7 @@ async function safeDb<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 async function home(chatId: number, text = welcomeText()): Promise<void> {
-  setConv(chatId, { ...getConv(chatId), step: "idle" });
+  setConv(chatId, { ...getConv(chatId), step: "idle", pendingPaper: undefined });
   await sendMessage(chatId, text);
 }
 
@@ -111,35 +119,40 @@ async function handleText(msg: TgMessage): Promise<void> {
     await safeDb(() => ensureUser(chatId), null);
   }
 
-  if (text === "/start" || text === BTN.mainMenu || text === "/menu") {
+  const route = deskTextRoute(text);
+  if (route === "home") {
     await home(chatId);
     return;
   }
-  if (text === "/help" || text === BTN.help) {
+  if (route === "help") {
     await sendMessage(chatId, helpText());
     return;
   }
-  if (text === "/settings" || text === BTN.settings) {
+  if (route === "settings") {
     await showSettings(chatId);
     return;
   }
-  if (text === "/thesis" || text === BTN.newThesis) {
+  if (route === "thesis") {
     await startThesis(chatId);
     return;
   }
-  if (text === BTN.myWatches || text === "/watches") {
+  if (route === "watches") {
     await showWatches(chatId);
     return;
   }
-  if (text === BTN.myPaper || text === "/paper") {
+  if (route === "paper") {
     await showPaper(chatId);
     return;
   }
-  if (text === BTN.lastReport || text === "/last") {
+  if (route === "records") {
+    await showRecords(chatId);
+    return;
+  }
+  if (route === "last") {
     await showLast(chatId);
     return;
   }
-  if (text === BTN.checkNow || text === "/check") {
+  if (route === "check") {
     await sendMessage(chatId, "Running check on watches + paper…");
     try {
       const results = await runCheckPass({ chatId, force: true });
@@ -147,7 +160,7 @@ async function handleText(msg: TgMessage): Promise<void> {
         await sendMessage(chatId, "No active watches or paper runs to check.");
         return;
       }
-      const lines = results.map((r) => `${r.symbol}: ${r.silent ? "silent price update" : r.action} (${r.reason})`);
+      const lines = results.map((r) => `${r.symbol}: ${r.silent ? "price updated" : r.action} (${r.reason})`);
       await sendMessage(chatId, `<b>CHECK NOW</b>\n${lines.join("\n")}`);
     } catch (err) {
       await sendMessage(chatId, `Check failed: ${err instanceof Error ? err.message : "unknown"}`);
@@ -171,7 +184,7 @@ async function handleText(msg: TgMessage): Promise<void> {
     return;
   }
 
-  await sendMessage(chatId, "Use the persistent keyboard. Tap NEW THESIS to start a desk cycle.");
+  await sendMessage(chatId, "Use the buttons below. Tap NEW THESIS to start a desk cycle.");
 }
 
 async function showSettings(chatId: number): Promise<void> {
@@ -210,6 +223,18 @@ async function handleCallback(cb: TgCallback): Promise<void> {
 
   if (data === CB.menu) {
     await home(chatId);
+    return;
+  }
+  if (data === CB.records) {
+    await showRecords(chatId);
+    return;
+  }
+  if (data === CB.myPaper) {
+    await showPaper(chatId);
+    return;
+  }
+  if (data.startsWith("pd:")) {
+    await handlePaperDir(chatId, data.slice(3));
     return;
   }
   if (data === CB.help) {
@@ -323,7 +348,7 @@ async function handleCard(chatId: number, kind: string): Promise<void> {
   }
   if (kind === "live") {
     try {
-      await callLiveFromReport(chatId, report, conv.side ?? report.bias, conv.lastWatchId);
+      await callLiveFromReport(chatId, report, null, conv.lastWatchId);
     } catch (err) {
       await sendMessage(chatId, `CALL LIVE failed: ${err instanceof Error ? err.message : "unknown"}`);
     }
@@ -331,7 +356,7 @@ async function handleCard(chatId: number, kind: string): Promise<void> {
   }
   if (kind === "watch") {
     if (!dbConfigured()) {
-      await sendMessage(chatId, "Supabase is not configured yet — cannot persist the watch.");
+      await sendMessage(chatId, "I can't save that watch right now.");
       return;
     }
     try {
@@ -369,7 +394,7 @@ async function handleCard(chatId: number, kind: string): Promise<void> {
 
 async function handleWatchAct(chatId: number, act: string, id: string): Promise<void> {
   if (!dbConfigured()) {
-    await sendMessage(chatId, "Database not configured.");
+    await sendMessage(chatId, "I can't reach the desk book right now.");
     return;
   }
   if (act === "live") {
