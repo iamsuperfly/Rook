@@ -16,6 +16,7 @@ declare
   open_count int;
 begin
   if NEW.status = 'open' then
+    perform pg_advisory_xact_lock(NEW.chat_id);
     select count(*) into open_count
     from public.paper_runs
     where chat_id = NEW.chat_id and status = 'open';

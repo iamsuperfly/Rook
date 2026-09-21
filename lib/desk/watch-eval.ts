@@ -26,3 +26,15 @@ export function watchCrossed(watch: WatchRow, last: number): boolean {
   if (!dir) return false;
   return crossedInvalidation(dir, last, storedInvalidationPrice(watch));
 }
+
+/** Alert must show the inv that was evaluated — never mix stored vs rewritten. */
+export function alertInvalidationPrice(opts: {
+  crossed: boolean;
+  storedInv: number | null;
+  rewrittenInv?: number | null;
+}): number | null {
+  if (opts.crossed) return opts.storedInv;
+  const next = opts.rewrittenInv;
+  if (next !== null && next !== undefined && Number.isFinite(Number(next))) return Number(next);
+  return opts.storedInv;
+}
