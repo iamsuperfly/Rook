@@ -14,6 +14,7 @@ import { dbConfigured } from "@/lib/db/supabase";
 import { getWatch } from "@/lib/db/watches";
 import { MAX_OPEN_PAPER, PaperLimitError, paperBias, resolveCallLiveSide, scorePaper } from "@/lib/desk/paper";
 import { PAPER_MIN_MARGIN, isPaperLeverage, paperExposure, stressPosition } from "@/lib/desk/paper-sim";
+import { describeError } from "@/lib/desk/errors";
 import type { JudgeReport } from "@/lib/types";
 import { sendMessage } from "./bot";
 import { fmtNum, fmtPct } from "./format";
@@ -50,7 +51,7 @@ function fundsMessage(err: unknown): string {
     if (err.message === "margin_too_small") return `Minimum isolated margin is ${PAPER_MIN_MARGIN} Paper USDT.`;
     if (err.message === "legacy_unlevered") return "This legacy paper row has no margin bucket. Stop it and open a new call.";
   }
-  return err instanceof Error ? err.message : "unknown";
+  return describeError(err);
 }
 
 async function entryPrice(symbol: string): Promise<number> {
@@ -64,13 +65,18 @@ export async function showWallet(chatId: number): Promise<void> {
     await sendMessage(chatId, "Supabase is not configured — no paper wallet.");
     return;
   }
-  const view = await paperWalletView(chatId);
-  await sendMessage(chatId, walletText(view), {
-    reply_markup: walletKeyboard({
-      canClaimInitial: view.canClaimInitial,
-      canClaimDaily: view.canClaimDaily,
-    }),
-  });
+  try {
+    const view = await paperWalletView(chatId);
+    await sendMessage(chatId, walletText(view), {
+      reply_markup: walletKeyboard({
+        canClaimInitial: view.canClaimInitial,
+        canClaimDaily: view.canClaimDaily,
+      }),
+    });
+  } catch (err) {
+    console.error("[wallet]", err);
+    await sendMessage(chatId, `WALLET failed: ${describeError(err)}`);
+  }
 }
 
 export async function handleWalletClaim(chatId: number, kind: "init" | "daily"): Promise<void> {
@@ -93,11 +99,16 @@ export async function showPaper(chatId: number): Promise<void> {
     await sendMessage(chatId, "Supabase is not configured — no paper book.");
     return;
   }
-  const rows = await listOpenPaperRuns(chatId);
-  const wallet = await paperWalletView(chatId);
-  await sendMessage(chatId, paperListText(rows, wallet), {
-    reply_markup: rows.length ? paperListKeyboard(rows.map((r) => r.id)) : openPaperEmptyKeyboard(),
-  });
+  try {
+    const rows = await listOpenPaperRuns(chatId);
+    const wallet = await paperWalletView(chatId);
+    await sendMessage(chatId, paperListText(rows, wallet), {
+      reply_markup: rows.length ? paperListKeyboard(rows.map((r) => r.id)) : openPaperEmptyKeyboard(),
+    });
+  } catch (err) {
+    console.error("[paper]", err);
+    await sendMessage(chatId, `MY PAPER failed: ${describeError(err)}`);
+  }
 }
 
 export async function showRecords(chatId: number): Promise<void> {
@@ -105,10 +116,15 @@ export async function showRecords(chatId: number): Promise<void> {
     await sendMessage(chatId, "Supabase is not configured — no paper book.");
     return;
   }
-  const rows = await listClosedPaperRuns(chatId);
-  await sendMessage(chatId, recordsListText(rows), {
-    reply_markup: rows.length ? recordsListKeyboard(rows.map((r) => r.id)) : openPaperEmptyKeyboard(),
-  });
+  try {
+    const rows = await listClosedPaperRuns(chatId);
+    await sendMessage(chatId, recordsListText(rows), {
+      reply_markup: rows.length ? recordsListKeyboard(rows.map((r) => r.id)) : openPaperEmptyKeyboard(),
+    });
+  } catch (err) {
+    console.error("[records]", err);
+    await sendMessage(chatId, `RECORDS failed: ${describeError(err)}`);
+  }
 }
 
 export async function promptPaperBias(chatId: number, report: JudgeReport, watchId?: string | null): Promise<void> {
@@ -228,21 +244,26 @@ export async function callLiveFromReport(
     await sendMessage(chatId, "Supabase is not configured — cannot freeze a paper snapshot.");
     return;
   }
-  const side = resolveCallLiveSide(paperBias(report), hintedSide);
-  if (!side) {
-    await promptPaperBias(chatId, report, watchId);
-    return;
+  try {
+    const side = resolveCallLiveSide(paperBias(report), hintedSide);
+    if (!side) {
+      await promptPaperBias(chatId, report, watchId);
+      return;
+    }
+    const open = await countOpenPaperRuns(chatId);
+    if (open >= MAX_OPEN_PAPER) {
+      await sendMessage(chatId, paperLimitText(), { reply_markup: paperLimitKeyboard() });
+      return;
+    }
+    const entry = await entryPrice(report.symbol);
+    patchConv(chatId, {
+      pendingPaper: { report, watchId: watchId ?? null, side, entry },
+    });
+    await promptMargin(chatId);
+  } catch (err) {
+    console.error("[call-live]", err);
+    await sendMessage(chatId, `CALL LIVE failed: ${describeError(err)}`);
   }
-  const open = await countOpenPaperRuns(chatId);
-  if (open >= MAX_OPEN_PAPER) {
-    await sendMessage(chatId, paperLimitText(), { reply_markup: paperLimitKeyboard() });
-    return;
-  }
-  const entry = await entryPrice(report.symbol);
-  patchConv(chatId, {
-    pendingPaper: { report, watchId: watchId ?? null, side, entry },
-  });
-  await promptMargin(chatId);
 }
 
 export async function handlePaperDir(chatId: number, dir: string): Promise<void> {
