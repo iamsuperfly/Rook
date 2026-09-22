@@ -30,10 +30,13 @@ describe("paper open-limit migrations", () => {
 describe("paper wallet migration 005", () => {
   it("adds paper_accounts and leveraged columns without rewriting 001-004", () => {
     expect(migration005).toContain("create table if not exists public.paper_accounts");
-    expect(migration005).toContain("claimed_initial");
+    expect(migration005).toContain("initial_claimed");
+    expect(migration005).not.toContain("claimed_initial");
     expect(migration005).toContain("add column if not exists margin_usdt");
     expect(migration005).toContain("add column if not exists leverage");
-    expect(migration005).toContain("add column if not exists liq_price");
+    expect(migration005).toContain("add column if not exists liquidation_price");
+    expect(migration005).not.toContain("liq_price");
+    expect(migration005).not.toContain("mmr");
     expect(migration005).not.toMatch(/drop table/i);
     expect(migration005).not.toContain("enforce_paper_open_limit");
   });

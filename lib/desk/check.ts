@@ -151,7 +151,7 @@ async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
           last_price: last,
           pnl_pct: scored.pnl_pct,
           pnl_usdt: scored.pnl_usdt,
-          liq_price: scored.liq_price,
+          liquidation_price: scored.liq_price,
         });
       }
       const silent = !closed;
@@ -163,6 +163,8 @@ async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
           pnl_usdt: scored.pnl_usdt,
           status: scored.status,
           close_reason: scored.close_reason,
+          liquidation_price: scored.liq_price,
+          liq_price: scored.liq_price,
         };
         await sendMessage(run.chat_id, paperCard(fresh), { reply_markup: paperKeyboard(run.id) });
       }

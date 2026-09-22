@@ -33,6 +33,13 @@ export function resolveCallLiveSide(reportBias: string, hintedSide?: string | nu
   return null;
 }
 
+export function storedLiqPrice(run: Pick<PaperRunRow, "liquidation_price" | "liq_price">): number | null {
+  const raw = run.liquidation_price ?? run.liq_price;
+  if (raw === null || raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function leveragedPaper(run: Pick<PaperRunRow, "margin_usdt" | "leverage">): boolean {
   return Number(run.margin_usdt ?? 0) > 0 && Number(run.leverage ?? 0) >= 1;
 }
@@ -53,9 +60,10 @@ export function scorePaper(
   const margin = Number(run.margin_usdt ?? 0);
   const lev = Number(run.leverage ?? 0);
   const exposure = Number(run.exposure_usdt ?? paperExposure(margin, lev));
+  const stored = storedLiqPrice(run);
   const liq =
-    run.liq_price != null
-      ? Number(run.liq_price)
+    stored != null
+      ? stored
       : side && leveragedPaper(run)
         ? liquidationPrice({ side, entry: Number(run.entry_price), leverage: lev })
         : null;

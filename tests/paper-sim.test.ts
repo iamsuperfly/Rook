@@ -79,8 +79,7 @@ describe("scorePaper liquidation vs invalidation", () => {
     margin_usdt: 100,
     leverage: 10,
     exposure_usdt: 1000,
-    mmr: PAPER_MMR,
-    liq_price: liquidationPrice({ side: "long", entry: 100, leverage: 10 }),
+    liquidation_price: liquidationPrice({ side: "long", entry: 100, leverage: 10 }),
   } as PaperRunRow;
 
   it("liquidates before thesis invalidation when LP is hit", () => {
@@ -96,7 +95,7 @@ describe("scorePaper liquidation vs invalidation", () => {
         exposure_usdt: 200,
         invalidation: { price: 80, note: "", rules: [] },
         thesis: { invalidation_price: 80 } as JudgeReport,
-        liq_price: liquidationPrice({ side: "long", entry: 100, leverage: 2 }),
+        liquidation_price: liquidationPrice({ side: "long", entry: 100, leverage: 2 }),
       },
       79,
     );
@@ -104,7 +103,7 @@ describe("scorePaper liquidation vs invalidation", () => {
   });
 
   it("leaves legacy unlevered rows on the thesis path", () => {
-    const scored = scorePaper({ ...base, margin_usdt: null, leverage: null, exposure_usdt: null, liq_price: null }, 49);
+    const scored = scorePaper({ ...base, margin_usdt: null, leverage: null, exposure_usdt: null, liquidation_price: null, liq_price: null }, 49);
     expect(scored.status).toBe("invalidated");
   });
 });
