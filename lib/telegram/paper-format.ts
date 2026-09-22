@@ -29,7 +29,8 @@ export function paperCard(run: PaperRunRow): string {
   const lev = Number(run.leverage ?? 0);
   const margin = Number(run.margin_usdt ?? 0);
   const last = Number(run.last_price ?? run.entry_price);
-  const liq = run.liq_price != null ? Number(run.liq_price) : null;
+  const rawLiq = run.liquidation_price ?? run.liq_price;
+  const liq = rawLiq != null ? Number(rawLiq) : null;
   const dist = leveragedPaper(run)
     ? distanceToLiquidationPct({ side: run.side, last, liq })
     : null;
