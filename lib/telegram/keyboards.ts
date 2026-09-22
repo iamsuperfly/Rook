@@ -30,6 +30,10 @@ export const BTN = {
   callOff: "CALL OFF",
   keep: "KEEP WATCHING",
   stopPaper: "STOP PAPER",
+  wallet: "WALLET",
+  claim: "CLAIM",
+  addMargin: "ADD MARGIN",
+  stress: "STRESS TEST",
   alerts: "ALERTS ON/OFF",
   interval: "CHECK EVERY 15m / 1h / 4h",
 } as const;
@@ -40,6 +44,7 @@ const MAIN_LABELS = new Set<string>([
   BTN.newThesis,
   BTN.myWatches,
   BTN.myPaper,
+  BTN.wallet,
   BTN.records,
   BTN.lastReport,
   BTN.checkNow,
@@ -56,9 +61,10 @@ export function mainReplyKeyboard() {
   return {
     keyboard: [
       [{ text: BTN.newThesis }, { text: BTN.myWatches }],
-      [{ text: BTN.myPaper }, { text: BTN.records }],
-      [{ text: BTN.checkNow }, { text: BTN.lastReport }],
-      [{ text: BTN.settings }, { text: BTN.help }],
+      [{ text: BTN.myPaper }, { text: BTN.wallet }],
+      [{ text: BTN.records }, { text: BTN.checkNow }],
+      [{ text: BTN.lastReport }, { text: BTN.settings }],
+      [{ text: BTN.help }],
     ],
     resize_keyboard: true,
     is_persistent: false,
@@ -73,6 +79,7 @@ export type DeskTextRoute =
   | "thesis"
   | "watches"
   | "paper"
+  | "wallet"
   | "records"
   | "last"
   | "check"
@@ -86,6 +93,7 @@ export function deskTextRoute(text: string): DeskTextRoute {
   if (t === "/thesis" || t === BTN.newThesis) return "thesis";
   if (t === BTN.myWatches || t === "/watches") return "watches";
   if (t === BTN.myPaper || t === "/paper") return "paper";
+  if (t === BTN.wallet || t === "/wallet") return "wallet";
   if (t === BTN.records || t === "/records") return "records";
   if (t === BTN.lastReport || t === "/last") return "last";
   if (t === BTN.checkNow || t === "/check") return "check";
@@ -107,6 +115,13 @@ export const CB = {
   watchAct: (act: string, id: string) => `w:${act}:${id}`,
   paperAct: (act: string, id: string) => `p:${act}:${id}`,
   paperDir: (s: string) => `pd:${s}`,
+  paperMargin: (n: string) => `pm:${n}`,
+  paperLev: (n: number) => `pl:${n}`,
+  paperAdd: (n: string, id: string) => `pa:${n}:${id}`,
+  paperStress: (id: string) => `ps:${id}`,
+  wallet: "nav:wallet",
+  claimInit: "pw:init",
+  claimDaily: "pw:daily",
   records: "nav:records",
   myPaper: "nav:paper",
   setAlerts: "set:alerts",
@@ -179,10 +194,61 @@ export function watchAlertKeyboard(watchId: string) {
 
 export function paperKeyboard(id: string) {
   return inline([
+    [
+      { text: BTN.addMargin, callback_data: CB.paperAct("add", id) },
+      { text: BTN.stress, callback_data: CB.paperStress(id) },
+    ],
     [{ text: BTN.stopPaper, callback_data: CB.paperAct("stop", id) }],
     [{ text: BTN.myPaper, callback_data: CB.myPaper }],
     [{ text: BTN.mainMenu, callback_data: CB.menu }],
   ]);
+}
+
+export function paperMarginKeyboard() {
+  return inline([
+    [
+      { text: "50", callback_data: CB.paperMargin("50") },
+      { text: "100", callback_data: CB.paperMargin("100") },
+      { text: "250", callback_data: CB.paperMargin("250") },
+    ],
+    [{ text: BTN.wallet, callback_data: CB.wallet }],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
+}
+
+export function paperLeverageKeyboard() {
+  return inline([
+    [
+      { text: "1x", callback_data: CB.paperLev(1) },
+      { text: "2x", callback_data: CB.paperLev(2) },
+      { text: "3x", callback_data: CB.paperLev(3) },
+    ],
+    [
+      { text: "5x", callback_data: CB.paperLev(5) },
+      { text: "10x", callback_data: CB.paperLev(10) },
+    ],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
+}
+
+export function paperAddMarginKeyboard(id: string) {
+  return inline([
+    [
+      { text: "+25", callback_data: CB.paperAdd("25", id) },
+      { text: "+50", callback_data: CB.paperAdd("50", id) },
+      { text: "+100", callback_data: CB.paperAdd("100", id) },
+    ],
+    [{ text: BTN.mainMenu, callback_data: CB.menu }],
+  ]);
+}
+
+export function walletKeyboard(opts: { canClaimInitial: boolean; canClaimDaily: boolean }) {
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [];
+  if (opts.canClaimInitial) rows.push([{ text: "CLAIM 10,000", callback_data: CB.claimInit }]);
+  if (opts.canClaimDaily) rows.push([{ text: "CLAIM 1,000", callback_data: CB.claimDaily }]);
+  rows.push([{ text: BTN.myPaper, callback_data: CB.myPaper }]);
+  rows.push([{ text: BTN.mainMenu, callback_data: CB.menu }]);
+  return inline(rows);
 }
 
 export function paperBiasKeyboard() {
