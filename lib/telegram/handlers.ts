@@ -42,10 +42,17 @@ import {
 import {
   callLiveFromReport,
   callLiveFromWatch,
+  handleAddMargin,
   handlePaperAct,
   handlePaperDir,
+  handlePaperLeverage,
+  handlePaperMargin,
+  handlePaperStress,
+  handlePaperTextAmount,
+  handleWalletClaim,
   showPaper,
   showRecords,
+  showWallet,
 } from "./paper-handlers";
 import { getConv, patchConv, setConv } from "./state";
 
@@ -144,6 +151,10 @@ async function handleText(msg: TgMessage): Promise<void> {
     await showPaper(chatId);
     return;
   }
+  if (route === "wallet") {
+    await showWallet(chatId);
+    return;
+  }
   if (route === "records") {
     await showRecords(chatId);
     return;
@@ -176,6 +187,9 @@ async function handleText(msg: TgMessage): Promise<void> {
   const conv = getConv(chatId);
   if (conv.step === "await_custom_symbol") {
     await runThesis(chatId, text);
+    return;
+  }
+  if (await handlePaperTextAmount(chatId, text)) {
     return;
   }
 
@@ -233,8 +247,40 @@ async function handleCallback(cb: TgCallback): Promise<void> {
     await showPaper(chatId);
     return;
   }
+  if (data === CB.wallet) {
+    await showWallet(chatId);
+    return;
+  }
+  if (data === CB.claimInit) {
+    await handleWalletClaim(chatId, "init");
+    return;
+  }
+  if (data === CB.claimDaily) {
+    await handleWalletClaim(chatId, "daily");
+    return;
+  }
   if (data.startsWith("pd:")) {
     await handlePaperDir(chatId, data.slice(3));
+    return;
+  }
+  if (data.startsWith("pm:")) {
+    await handlePaperMargin(chatId, data.slice(3));
+    return;
+  }
+  if (data.startsWith("pl:")) {
+    await handlePaperLeverage(chatId, data.slice(3));
+    return;
+  }
+  if (data.startsWith("pa:")) {
+    const rest = data.slice(3);
+    const split = rest.indexOf(":");
+    const amount = split === -1 ? rest : rest.slice(0, split);
+    const id = split === -1 ? undefined : rest.slice(split + 1);
+    await handleAddMargin(chatId, amount, id);
+    return;
+  }
+  if (data.startsWith("ps:")) {
+    await handlePaperStress(chatId, data.slice(3));
     return;
   }
   if (data === CB.help) {
