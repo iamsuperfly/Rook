@@ -3,7 +3,7 @@ export type Side = "long" | "short" | "decide";
 export type Bias = "long" | "short" | "none";
 export type DeskAction = "watch" | "reject" | "call_off" | "hold";
 export type CheckEvery = "15m" | "1h" | "4h";
-export type PaperStatus = "open" | "stopped" | "invalidated";
+export type PaperStatus = "open" | "stopped" | "invalidated" | "liquidated";
 
 export interface MarketSnapshot {
   symbol: string;
@@ -74,11 +74,25 @@ export interface PaperRunRow {
   entry_price: number;
   last_price: number | null;
   pnl_pct: number | null;
+  pnl_usdt?: number | null;
+  margin_usdt?: number | null;
+  leverage?: number | null;
+  exposure_usdt?: number | null;
+  mmr?: number | null;
+  liq_price?: number | null;
   thesis: JudgeReport;
   invalidation: InvalidationBlob | null;
   opened_at: string;
   closed_at: string | null;
   close_reason: string | null;
+  updated_at: string;
+}
+
+export interface PaperAccountRow {
+  chat_id: number;
+  available_usdt: number;
+  claimed_initial: boolean;
+  last_daily_claim_at: string | null;
   updated_at: string;
 }
 
@@ -94,11 +108,17 @@ export type ConvStep =
   | "await_horizon"
   | "await_side"
   | "await_market"
-  | "await_custom_symbol";
+  | "await_custom_symbol"
+  | "await_paper_margin"
+  | "await_paper_leverage"
+  | "await_add_margin";
 
 export interface PendingPaper {
   report: JudgeReport;
   watchId: string | null;
+  side?: string;
+  entry?: number;
+  marginUsdt?: number;
 }
 
 export interface Conversation {

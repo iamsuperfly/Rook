@@ -1,7 +1,7 @@
 import { moveVsSnapshotPct, scoutSymbol } from "@/lib/bitget/scout";
 import { agentHubTicker } from "@/lib/bitget/agent-market";
 import { dbConfigured } from "@/lib/db/supabase";
-import { listOpenPaperRuns, updatePaperRun } from "@/lib/db/paper";
+import { listOpenPaperRuns, settlePaperClose, updatePaperRun } from "@/lib/db/paper";
 import { getUser, getWatch, listActiveWatches, updateWatchSnapshot } from "@/lib/db/watches";
 import { sendMessage } from "@/lib/telegram/bot";
 import { alertText } from "@/lib/telegram/format";
@@ -136,16 +136,34 @@ async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
       const last = await lastPrice(run.symbol);
       const scored = scorePaper(run, last);
       const closed = scored.status !== "open";
-      await updatePaperRun(run.id, {
-        last_price: last,
-        pnl_pct: scored.pnl_pct,
-        status: scored.status,
-        close_reason: scored.close_reason,
-        closed_at: closed ? new Date().toISOString() : run.closed_at,
-      });
+      if (closed) {
+        await settlePaperClose({
+          id: run.id,
+          chatId: run.chat_id,
+          status: scored.status,
+          last,
+          pnlPct: scored.pnl_pct,
+          pnlUsdt: scored.pnl_usdt,
+          closeReason: scored.close_reason,
+        });
+      } else {
+        await updatePaperRun(run.id, {
+          last_price: last,
+          pnl_pct: scored.pnl_pct,
+          pnl_usdt: scored.pnl_usdt,
+          liq_price: scored.liq_price,
+        });
+      }
       const silent = !closed;
       if (!silent) {
-        const fresh = { ...run, last_price: last, pnl_pct: scored.pnl_pct, status: scored.status, close_reason: scored.close_reason };
+        const fresh = {
+          ...run,
+          last_price: last,
+          pnl_pct: scored.pnl_pct,
+          pnl_usdt: scored.pnl_usdt,
+          status: scored.status,
+          close_reason: scored.close_reason,
+        };
         await sendMessage(run.chat_id, paperCard(fresh), { reply_markup: paperKeyboard(run.id) });
       }
       out.push({

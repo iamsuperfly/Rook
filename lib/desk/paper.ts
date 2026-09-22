@@ -1,5 +1,13 @@
 import { crossedInvalidation } from "@/lib/bitget/scout";
 import type { Bias, JudgeReport, PaperRunRow, PaperStatus } from "@/lib/types";
+import {
+  crossedLiquidation,
+  isLiquidatedByEquity,
+  liquidationPrice,
+  paperExposure,
+  paperPnlUsdt,
+  realizedClosePnl,
+} from "./paper-sim";
 
 export const MAX_OPEN_PAPER = 10;
 
@@ -25,29 +33,67 @@ export function resolveCallLiveSide(reportBias: string, hintedSide?: string | nu
   return null;
 }
 
+export function leveragedPaper(run: Pick<PaperRunRow, "margin_usdt" | "leverage">): boolean {
+  return Number(run.margin_usdt ?? 0) > 0 && Number(run.leverage ?? 0) >= 1;
+}
+
 export function scorePaper(
   run: PaperRunRow,
   last: number,
 ): {
   pnl_pct: number | null;
+  pnl_usdt: number | null;
   status: PaperStatus;
   close_reason: string | null;
+  liq_price: number | null;
 } {
   const side = isPaperDir(run.side) ? run.side : null;
   const inv = run.invalidation?.price ?? run.thesis?.invalidation_price ?? null;
-  const pnl = side ? paperPnlPct(side, Number(run.entry_price), last) : null;
+  const pnlPct = side ? paperPnlPct(side, Number(run.entry_price), last) : null;
+  const margin = Number(run.margin_usdt ?? 0);
+  const lev = Number(run.leverage ?? 0);
+  const exposure = Number(run.exposure_usdt ?? paperExposure(margin, lev));
+  const liq =
+    run.liq_price != null
+      ? Number(run.liq_price)
+      : side && leveragedPaper(run)
+        ? liquidationPrice({ side, entry: Number(run.entry_price), leverage: lev })
+        : null;
+  const pnlUsdt = side && leveragedPaper(run)
+    ? paperPnlUsdt({ side, entry: Number(run.entry_price), last, exposure })
+    : null;
+
+  if (side && leveragedPaper(run)) {
+    const byPrice = crossedLiquidation({ side, last, liq });
+    const byEquity = isLiquidatedByEquity({ marginUsdt: margin, pnlUsdt, exposure });
+    if (byPrice || byEquity) {
+      const realized = realizedClosePnl({ liquidated: true, marginUsdt: margin, pnlUsdt });
+      return {
+        pnl_pct: pnlPct,
+        pnl_usdt: realized,
+        status: "liquidated",
+        close_reason: `Simulated liquidation at ${last} (LP ${liq})`,
+        liq_price: liq,
+      };
+    }
+  }
+
   const crossed = side ? crossedInvalidation(side, last, inv) : false;
   if (crossed) {
     return {
-      pnl_pct: pnl,
+      pnl_pct: pnlPct,
+      pnl_usdt: pnlUsdt,
       status: "invalidated",
       close_reason: `Invalidation crossed at ${last} vs ${inv}`,
+      liq_price: liq,
     };
   }
   return {
-    pnl_pct: pnl,
+    pnl_pct: pnlPct,
+    pnl_usdt: pnlUsdt,
     status: run.status === "open" ? "open" : run.status,
     close_reason: run.close_reason,
+    liq_price: liq,
   };
 }
 
@@ -66,6 +112,7 @@ export function recordsStats(rows: PaperRunRow[]): {
   closed: number;
   wins: number;
   losses: number;
+  liquidated: number;
   avgWinner: number | null;
   avgLoser: number | null;
 } {
@@ -79,6 +126,7 @@ export function recordsStats(rows: PaperRunRow[]): {
     closed: closed.length,
     wins: wins.length,
     losses: losses.length,
+    liquidated: closed.filter((r) => r.status === "liquidated").length,
     avgWinner: avg(wins),
     avgLoser: avg(losses),
   };
