@@ -2,7 +2,6 @@ import type { Horizon, InvalidationBlob, JudgeReport, PaperRunRow, PaperStatus }
 import { MAX_OPEN_PAPER, PaperLimitError, isPaperDir } from "@/lib/desk/paper";
 import {
   PAPER_MIN_MARGIN,
-  PAPER_MMR,
   isPaperLeverage,
   liquidationPrice,
   paperExposure,
@@ -10,6 +9,26 @@ import {
 import { PaperFundsError, creditAvailable, debitAvailable } from "./paper-wallet";
 import { getServiceDb } from "./supabase";
 import { ensureUser } from "./watches";
+
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Map applied-005 `liquidation_price` onto the in-memory alias. */
+export function storedLiqPrice(run: Pick<PaperRunRow, "liquidation_price" | "liq_price">): number | null {
+  return numOrNull(run.liquidation_price ?? run.liq_price);
+}
+
+export function asPaperRun(row: Record<string, unknown>): PaperRunRow {
+  const liq = numOrNull(row.liquidation_price ?? row.liq_price);
+  return {
+    ...(row as unknown as PaperRunRow),
+    liquidation_price: liq,
+    liq_price: liq,
+  };
+}
 
 export async function countOpenPaperRuns(chatId: number): Promise<number> {
   const db = getServiceDb();
@@ -76,8 +95,7 @@ export async function openPaperRun(opts: {
       margin_usdt: opts.marginUsdt,
       leverage: opts.leverage,
       exposure_usdt: exposure,
-      mmr: PAPER_MMR,
-      liq_price: liq,
+      liquidation_price: liq,
       thesis: opts.report,
       invalidation: inv,
     })
@@ -89,7 +107,7 @@ export async function openPaperRun(opts: {
     if (msg.includes("paper_open_limit")) throw new PaperLimitError();
     throw error;
   }
-  return data as PaperRunRow;
+  return asPaperRun(data as Record<string, unknown>);
 }
 
 export async function addPaperMargin(id: string, chatId: number, amount: number): Promise<PaperRunRow> {
@@ -115,7 +133,7 @@ export async function addPaperMargin(id: string, chatId: number, amount: number)
     .update({
       margin_usdt: nextMargin,
       leverage: nextLev,
-      liq_price: liq,
+      liquidation_price: liq,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -126,7 +144,7 @@ export async function addPaperMargin(id: string, chatId: number, amount: number)
     await creditAvailable(chatId, amount).catch(() => undefined);
     throw error;
   }
-  return data as PaperRunRow;
+  return asPaperRun(data as Record<string, unknown>);
 }
 
 export async function settlePaperClose(opts: {
@@ -165,7 +183,7 @@ export async function listPaperRuns(chatId: number, openOnly = false): Promise<P
   if (openOnly) q = q.eq("status", "open");
   const { data, error } = await q.limit(20);
   if (error) throw error;
-  return (data ?? []) as PaperRunRow[];
+  return (data ?? []).map((row) => asPaperRun(row as Record<string, unknown>));
 }
 
 export async function listOpenPaperRuns(chatId?: number): Promise<PaperRunRow[]> {
@@ -174,7 +192,7 @@ export async function listOpenPaperRuns(chatId?: number): Promise<PaperRunRow[]>
   if (chatId !== undefined) q = q.eq("chat_id", chatId);
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []) as PaperRunRow[];
+  return (data ?? []).map((row) => asPaperRun(row as Record<string, unknown>));
 }
 
 export async function listClosedPaperRuns(chatId: number): Promise<PaperRunRow[]> {
@@ -187,14 +205,14 @@ export async function listClosedPaperRuns(chatId: number): Promise<PaperRunRow[]
     .order("updated_at", { ascending: false })
     .limit(30);
   if (error) throw error;
-  return (data ?? []) as PaperRunRow[];
+  return (data ?? []).map((row) => asPaperRun(row as Record<string, unknown>));
 }
 
 export async function getPaperRun(id: string): Promise<PaperRunRow | null> {
   const db = getServiceDb();
   const { data, error } = await db.from("paper_runs").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
-  return (data as PaperRunRow) ?? null;
+  return data ? asPaperRun(data as Record<string, unknown>) : null;
 }
 
 export async function updatePaperRun(
@@ -202,19 +220,25 @@ export async function updatePaperRun(
   patch: Partial<
     Pick<
       PaperRunRow,
-      "last_price" | "pnl_pct" | "pnl_usdt" | "status" | "close_reason" | "closed_at" | "margin_usdt" | "leverage" | "liq_price"
+      "last_price" | "pnl_pct" | "pnl_usdt" | "status" | "close_reason" | "closed_at" | "margin_usdt" | "leverage" | "liquidation_price" | "liq_price"
     >
   >,
 ): Promise<PaperRunRow> {
   const db = getServiceDb();
+  const { liq_price, liquidation_price, ...rest } = patch;
+  const nextLiq = liquidation_price ?? liq_price;
   const { data, error } = await db
     .from("paper_runs")
-    .update({ ...patch, updated_at: new Date().toISOString() })
+    .update({
+      ...rest,
+      ...(nextLiq !== undefined ? { liquidation_price: nextLiq } : {}),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .select("*")
     .single();
   if (error) throw error;
-  return data as PaperRunRow;
+  return asPaperRun(data as Record<string, unknown>);
 }
 
 export type { PaperStatus };
