@@ -14,11 +14,21 @@ export class PaperFundsError extends Error {
   }
 }
 
+function asAccount(row: Record<string, unknown>): PaperAccountRow {
+  return {
+    chat_id: Number(row.chat_id),
+    available_usdt: Number(row.available_usdt ?? 0),
+    initial_claimed: Boolean(row.initial_claimed ?? row.claimed_initial),
+    last_daily_claim_at: (row.last_daily_claim_at as string | null) ?? null,
+    updated_at: String(row.updated_at ?? ""),
+  };
+}
+
 export async function getPaperAccount(chatId: number): Promise<PaperAccountRow | null> {
   const db = getServiceDb();
   const { data, error } = await db.from("paper_accounts").select("*").eq("chat_id", chatId).maybeSingle();
   if (error) throw error;
-  return (data as PaperAccountRow) ?? null;
+  return data ? asAccount(data as Record<string, unknown>) : null;
 }
 
 export async function ensurePaperAccount(chatId: number): Promise<PaperAccountRow> {
@@ -31,7 +41,7 @@ export async function ensurePaperAccount(chatId: number): Promise<PaperAccountRo
     .insert({
       chat_id: chatId,
       available_usdt: 0,
-      claimed_initial: false,
+      initial_claimed: false,
       last_daily_claim_at: null,
     })
     .select("*")
@@ -41,7 +51,7 @@ export async function ensurePaperAccount(chatId: number): Promise<PaperAccountRo
     if (raced) return raced;
     throw error;
   }
-  return data as PaperAccountRow;
+  return asAccount(data as Record<string, unknown>);
 }
 
 export async function committedMarginUsdt(chatId: number): Promise<number> {
@@ -71,36 +81,36 @@ export async function paperWalletView(chatId: number): Promise<{
     available,
     inPositions,
     paperBalance: available + inPositions,
-    canClaimInitial: !account.claimed_initial,
-    canClaimDaily: account.claimed_initial && dailyClaimAvailable(account.last_daily_claim_at),
+    canClaimInitial: !account.initial_claimed,
+    canClaimDaily: account.initial_claimed && dailyClaimAvailable(account.last_daily_claim_at),
   };
 }
 
 export async function claimInitial(chatId: number): Promise<PaperAccountRow> {
   const account = await ensurePaperAccount(chatId);
-  if (account.claimed_initial) throw new PaperFundsError("initial_already_claimed");
+  if (account.initial_claimed) throw new PaperFundsError("initial_already_claimed");
   const db = getServiceDb();
   const next = Number(account.available_usdt) + PAPER_INITIAL_USDT;
   const { data, error } = await db
     .from("paper_accounts")
     .update({
       available_usdt: next,
-      claimed_initial: true,
+      initial_claimed: true,
       last_daily_claim_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("chat_id", chatId)
-    .eq("claimed_initial", false)
+    .eq("initial_claimed", false)
     .select("*")
     .single();
   if (error) throw error;
   if (!data) throw new PaperFundsError("initial_already_claimed");
-  return data as PaperAccountRow;
+  return asAccount(data as Record<string, unknown>);
 }
 
 export async function claimDaily(chatId: number): Promise<PaperAccountRow> {
   const account = await ensurePaperAccount(chatId);
-  if (!account.claimed_initial) throw new PaperFundsError("claim_initial_first");
+  if (!account.initial_claimed) throw new PaperFundsError("claim_initial_first");
   if (!dailyClaimAvailable(account.last_daily_claim_at)) throw new PaperFundsError("daily_already_claimed");
   const db = getServiceDb();
   const next = Number(account.available_usdt) + PAPER_DAILY_USDT;
@@ -115,7 +125,7 @@ export async function claimDaily(chatId: number): Promise<PaperAccountRow> {
     .select("*")
     .single();
   if (error) throw error;
-  return data as PaperAccountRow;
+  return asAccount(data as Record<string, unknown>);
 }
 
 export async function debitAvailable(chatId: number, amount: number): Promise<PaperAccountRow> {
@@ -134,7 +144,7 @@ export async function debitAvailable(chatId: number, amount: number): Promise<Pa
     .select("*")
     .single();
   if (error) throw error;
-  return data as PaperAccountRow;
+  return asAccount(data as Record<string, unknown>);
 }
 
 export async function creditAvailable(chatId: number, amount: number): Promise<PaperAccountRow> {
@@ -151,5 +161,5 @@ export async function creditAvailable(chatId: number, amount: number): Promise<P
     .select("*")
     .single();
   if (error) throw error;
-  return data as PaperAccountRow;
+  return asAccount(data as Record<string, unknown>);
 }

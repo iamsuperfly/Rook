@@ -78,7 +78,9 @@ export interface PaperRunRow {
   margin_usdt?: number | null;
   leverage?: number | null;
   exposure_usdt?: number | null;
-  mmr?: number | null;
+  /** Applied 005 column. */
+  liquidation_price?: number | null;
+  /** Legacy alias if an older row ever stored this name. */
   liq_price?: number | null;
   thesis: JudgeReport;
   invalidation: InvalidationBlob | null;
@@ -91,7 +93,8 @@ export interface PaperRunRow {
 export interface PaperAccountRow {
   chat_id: number;
   available_usdt: number;
-  claimed_initial: boolean;
+  /** Applied 005 column. */
+  initial_claimed: boolean;
   last_daily_claim_at: string | null;
   updated_at: string;
 }
