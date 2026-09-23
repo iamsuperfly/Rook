@@ -25,16 +25,34 @@ source crew/.venv/bin/activate
 python crew/crew.py BTCUSDT 7d decide
 ```
 
-JSON mode (what Next.js spawns):
+JSON mode (what Next.js can spawn locally):
 
 ```bash
 echo '{"symbol":"BTCUSDT","horizon":"7d","side":"decide"}' | python crew/crew.py --json
 ```
 
-## Production
+## Remote worker (Replit Deployment)
 
-`lib/desk/debate.ts` tries `crew-bridge` first (`CREW_ENABLED=true`).
-If Python/Crew is missing on Vercel Hobby, it falls back to the TypeScript Groq path with the **same Judge schema and the same signal notes**.
+Vercel Hobby cannot spawn Python. Point the desk at a live worker instead:
+
+```bash
+export CREW_HTTP_SECRET=pick-a-long-random-string
+python crew/http_server.py
+```
+
+- `GET /health` — liveness
+- `POST /debate` — same JSON body as stdin `--json` (`symbol`, `horizon`, `side`, `snapshot`)
+- Requires `Authorization: Bearer $CREW_HTTP_SECRET`
+
+On Vercel set:
+
+```
+CREW_ENABLED=true
+CREW_HTTP_URL=https://YOUR-REPLIT-DEPLOYMENT
+CREW_HTTP_SECRET=same-string-as-the-worker
+```
+
+`lib/desk/debate.ts` still tries Crew first. If the HTTP worker is down, it falls back to the TypeScript Groq path.
 
 Cron still wakes `/api/check`. Crew does not schedule itself.
 

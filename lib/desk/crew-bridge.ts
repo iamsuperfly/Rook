@@ -9,6 +9,50 @@ export function crewEnabled(): boolean {
   return v !== "0" && v !== "false" && v !== "off";
 }
 
+export function crewHttpUrl(): string | null {
+  const raw = (process.env.CREW_HTTP_URL ?? "").trim().replace(/\/$/, "");
+  return raw.length ? raw : null;
+}
+
+function crewHttpHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  const secret = (process.env.CREW_HTTP_SECRET ?? "").trim();
+  if (secret) headers.authorization = `Bearer ${secret}`;
+  return headers;
+}
+
+export async function runCrewHttp(opts: {
+  symbol: string;
+  horizon: Horizon;
+  side: Side;
+  snapshot: MarketSnapshot;
+  timeoutMs?: number;
+}): Promise<JudgeReport> {
+  const base = crewHttpUrl();
+  if (!base) throw new Error("crew_http_unconfigured");
+  const timeoutMs = opts.timeoutMs ?? 90_000;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${base}/debate`, {
+      method: "POST",
+      headers: crewHttpHeaders(),
+      body: JSON.stringify({
+        symbol: opts.symbol,
+        horizon: opts.horizon,
+        side: opts.side,
+        snapshot: opts.snapshot,
+      }),
+      signal: ctrl.signal,
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`crew_http_${res.status}:${text.slice(0, 400)}`);
+    return applyAuthoritativeInvalidation(parseJudgeReport(text, opts.symbol, opts.horizon), opts.snapshot);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function runCrewPython(opts: {
   symbol: string;
   horizon: Horizon;
@@ -60,6 +104,17 @@ export async function runCrewPython(opts: {
   });
 }
 
+export async function runCrewEngine(opts: {
+  symbol: string;
+  horizon: Horizon;
+  side: Side;
+  snapshot: MarketSnapshot;
+  timeoutMs?: number;
+}): Promise<JudgeReport> {
+  if (crewHttpUrl()) return runCrewHttp(opts);
+  return runCrewPython(opts);
+}
+
 export async function debateViaCrew(opts: {
   symbol: string;
   horizon: Horizon;
@@ -69,7 +124,7 @@ export async function debateViaCrew(opts: {
 }): Promise<DebateBundle | null> {
   if (!crewEnabled()) return null;
   try {
-    const report = await runCrewPython({
+    const report = await runCrewEngine({
       symbol: opts.symbol,
       horizon: opts.horizon,
       side: opts.side,
@@ -84,7 +139,7 @@ export async function debateViaCrew(opts: {
       report,
     };
   } catch (err) {
-    console.warn("[crew-bridge] spawn failed, caller should fallback", err);
+    console.warn("[crew-bridge] crew engine failed, caller should fallback", err);
     return null;
   }
 }
