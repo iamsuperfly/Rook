@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { fmtUtc } from "@/lib/telegram/format";
-import { displayPnlUsdt, marginPromptText, PAPER_DISCLAIMER, paperCard } from "@/lib/telegram/paper-format";
+import {
+  addMarginResultText,
+  displayPnlUsdt,
+  marginPromptText,
+  PAPER_DISCLAIMER,
+  paperCard,
+} from "@/lib/telegram/paper-format";
 import { JUDGE_SYSTEM } from "@/lib/desk/prompts";
 import type { PaperRunRow } from "@/lib/types";
 
@@ -62,39 +68,20 @@ describe("judge prompt stays observational", () => {
   });
 });
 
-describe("paper card", () => {
-  it("labels estimated liquidation as simulated", () => {
-    const card = paperCard({
-      id: "1",
-      chat_id: 1,
-      watch_id: null,
-      symbol: "BTCUSDT",
-      horizon: "7d",
-      side: "short",
-      status: "open",
-      entry_price: 85917.12,
-      last_price: 85917.12,
-      pnl_pct: 0,
-      pnl_usdt: 0,
-      thesis: { strategy: "Monitor acceptance below the range." },
-      invalidation: {
-        price: 87400,
-        note: "Short is invalidated if last trades at or above 87400",
-        rules: ["Buy-side volume spikes"],
-      },
-      opened_at: "2026-09-22T09:08:38.900242+00:00",
-      closed_at: null,
-      close_reason: null,
-      updated_at: "",
-      margin_usdt: 50,
-      leverage: 10,
-      exposure_usdt: 500,
-      liquidation_price: 94500,
-    } as unknown as PaperRunRow);
-    expect(card).toMatch(/Est\. liq \(sim\)/);
-    expect(card).toMatch(/22 Sep 2026 09:08 UTC/);
-    expect(card).toMatch(/87400/);
-    expect(card).toMatch(/Paper simulation/);
-    expect(card).not.toMatch(/Still no order on Bitget/);
+describe("add margin copy", () => {
+  it("explains unchanged exposure and falling leverage", () => {
+    const text = addMarginResultText({
+      oldMargin: 50,
+      newMargin: 75,
+      exposure: 500,
+      oldLeverage: 10,
+      newLeverage: 500 / 75,
+    });
+    expect(text).toMatch(/50/);
+    expect(text).toMatch(/75/);
+    expect(text).toMatch(/Exposure remains/);
+    expect(text).toMatch(/10x/);
+    expect(text).toMatch(/6\.67x/);
+    expect(text).not.toMatch(/liquidity/i);
   });
 });
