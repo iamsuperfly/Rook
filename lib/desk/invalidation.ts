@@ -4,6 +4,12 @@ import type { JudgeReport, MarketSnapshot } from "@/lib/types";
 /** Minimum adverse gap when the model copies snapshot last as the close line. */
 export const FALLBACK_ADVERSE_PCT = 1;
 
+export type InvalidationSnapshot = Pick<MarketSnapshot, "last"> & {
+  high24h?: number | null;
+  low24h?: number | null;
+  sma20?: number | null;
+};
+
 export function sideFromBias(bias: string | null | undefined): "long" | "short" | null {
   const s = (bias ?? "").toLowerCase();
   if (s === "long" || s === "short") return s;
@@ -63,7 +69,7 @@ export function deterministicInvalidationNote(side: "long" | "short", price: num
 
 export function applyAuthoritativeInvalidation(
   report: JudgeReport,
-  snapshot: Pick<MarketSnapshot, "last" | "high24h" | "low24h" | "sma20">,
+  snapshot: InvalidationSnapshot,
   sideOverride?: "long" | "short" | null,
 ): JudgeReport {
   const side = sideOverride ?? sideFromBias(report.bias);
