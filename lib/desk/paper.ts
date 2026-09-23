@@ -80,7 +80,7 @@ export function scorePaper(
         pnl_pct: pnlPct,
         pnl_usdt: realized,
         status: "liquidated",
-        close_reason: `Simulated liquidation at ${last} (LP ${liq})`,
+        close_reason: `Simulated liquidation at ${last} (estimated liquidation ${liq})`,
         liq_price: liq,
       };
     }

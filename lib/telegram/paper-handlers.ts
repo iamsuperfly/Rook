@@ -17,7 +17,6 @@ import { PAPER_MIN_MARGIN, isPaperLeverage, paperExposure, stressPosition } from
 import { describeError } from "@/lib/desk/errors";
 import type { JudgeReport } from "@/lib/types";
 import { sendMessage } from "./bot";
-import { fmtNum, fmtPct } from "./format";
 import {
   openPaperEmptyKeyboard,
   paperAddMarginKeyboard,
@@ -31,6 +30,7 @@ import {
   walletKeyboard,
 } from "./keyboards";
 import {
+  addMarginResultText,
   leveragePromptText,
   marginPromptText,
   noBiasText,
@@ -38,6 +38,7 @@ import {
   paperLimitText,
   paperListText,
   recordsListText,
+  stressText,
   walletText,
 } from "./paper-format";
 import { getConv, patchConv } from "./state";
@@ -221,8 +222,7 @@ async function finishOpen(chatId: number, marginUsdt: number, leverage: number):
     const exposure = paperExposure(marginUsdt, leverage);
     await sendMessage(
       chatId,
-      paperCard(run) +
-        `\n\nIsolated paper ${leverage}x on ${exposure} notional. Still no order on Bitget.`,
+      paperCard(run) + `\n\nIsolated paper ${leverage}x on ${exposure} notional.`,
       { reply_markup: paperKeyboard(run.id) },
     );
   } catch (err) {
@@ -241,7 +241,7 @@ export async function callLiveFromReport(
   watchId?: string | null,
 ): Promise<void> {
   if (!dbConfigured()) {
-    await sendMessage(chatId, "Supabase is not configured — cannot freeze a paper snapshot.");
+    await sendMessage(chatId, "Supabase is not configured — cannot open a paper call.");
     return;
   }
   try {
@@ -301,7 +301,7 @@ export async function handlePaperAct(chatId: number, act: string, id: string): P
       return;
     }
     patchConv(chatId, { step: "await_add_margin", lastPaperId: run.id });
-    await sendMessage(chatId, "Add isolated margin. Pick an amount or type a number.", {
+    await sendMessage(chatId, "Add isolated margin. Exposure stays the same; effective leverage falls.", {
       reply_markup: paperAddMarginKeyboard(run.id),
     });
     return;
@@ -334,11 +334,25 @@ export async function handleAddMargin(chatId: number, raw: string, id?: string):
   }
   const amount = Number(raw);
   try {
+    const before = await getPaperRun(paperId);
     const run = await addPaperMargin(paperId, chatId, amount);
     patchConv(chatId, { step: "idle" });
-    await sendMessage(chatId, paperCard(run) + "\n\nMargin added. Liquidation price moved.", {
-      reply_markup: paperKeyboard(run.id),
-    });
+    const beforeMargin = Number(before?.margin_usdt ?? Number(run.margin_usdt) - amount);
+    const afterMargin = Number(run.margin_usdt ?? 0);
+    const exposure = Number(run.exposure_usdt ?? 0);
+    const beforeLev = beforeMargin > 0 && exposure > 0 ? exposure / beforeMargin : Number(before?.leverage ?? 0);
+    const afterLev = Number(run.leverage ?? 0);
+    await sendMessage(
+      chatId,
+      `${addMarginResultText({
+        beforeMargin,
+        afterMargin,
+        exposure,
+        beforeLeverage: beforeLev,
+        afterLeverage: afterLev,
+      })}\n\n${paperCard(run)}`,
+      { reply_markup: paperKeyboard(run.id) },
+    );
   } catch (err) {
     await sendMessage(chatId, `ADD MARGIN failed: ${fundsMessage(err)}`);
   }
@@ -359,23 +373,14 @@ export async function handlePaperStress(chatId: number, id: string): Promise<voi
     leverage: Number(run.leverage ?? 1),
     extraMargin: 50,
   });
-  const lines = stress.rows.map((row) => {
-    const mark = row.wouldLiquidate ? "LIQ" : "ok";
-    return `−${row.adversePct}% → last ${fmtNum(row.last)} · ${fmtPct(row.returnOnMarginPct)} · ${mark}`;
-  });
   await sendMessage(
     chatId,
-    [
-      `<b>STRESS // ${run.symbol}</b>`,
-      `Current LP ${fmtNum(stress.baselineLiq)}`,
-      stress.withExtraLiq != null ? `LP after +50 margin ${fmtNum(stress.withExtraLiq)}` : "",
-      "",
-      ...lines,
-      "",
-      "<i>Numbers only. Rook does not add margin or close this call.</i>",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    stressText({
+      symbol: run.symbol,
+      baselineLiq: stress.baselineLiq,
+      withExtraLiq: stress.withExtraLiq,
+      rows: stress.rows,
+    }),
     { reply_markup: paperKeyboard(run.id) },
   );
 }

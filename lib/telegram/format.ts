@@ -2,7 +2,27 @@ import { DISCLAIMER, type JudgeReport, type MarketSnapshot, type WatchRow } from
 import { distancePct } from "@/lib/bitget/scout";
 
 export function esc(s: string): string {
-  return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export function heading(title: string): string {
+  return `<b>${esc(title)}</b>`;
+}
+
+export function instrument(symbol: string): string {
+  return `<code>${esc(symbol)}</code>`;
+}
+
+export function emphasis(value: string | number): string {
+  return `<b>${esc(String(value))}</b>`;
+}
+
+export function price(n: number | null | undefined, digits = 4): string {
+  return emphasis(fmtNum(n, digits));
+}
+
+export function metadata(text: string): string {
+  return `<i>${esc(text)}</i>`;
 }
 
 function bullets(items: string[], empty = "\u2014"): string {
@@ -33,13 +53,22 @@ export function fmtPct(n: number | null | undefined): string {
   return `${sign}${n.toFixed(2)}%`;
 }
 
+export function invRelationLabel(last: number, inv: number | null | undefined): string {
+  if (inv == null || !Number.isFinite(inv) || !Number.isFinite(last) || last === 0) return "n/a";
+  const d = distancePct(last, inv);
+  if (d == null) return "n/a";
+  if (Math.abs(d) < 0.005) return "at invalidation";
+  const abs = Math.abs(d).toFixed(2);
+  return last > inv ? `${abs}% above invalidation` : `${abs}% below invalidation`;
+}
+
 export function footer(): string {
-  return `\n\n<i>${esc(DISCLAIMER)}</i>`;
+  return `\n\n${metadata(DISCLAIMER)}`;
 }
 
 export function welcomeText(): string {
   return [
-    "<b>ROOK</b> \u2014 adversarial desk for Bitget tokenized US names / USDT markets.",
+    `${heading("ROOK")} \u2014 adversarial desk for Bitget tokenized US names / USDT markets.`,
     "",
     "I build a thesis, attack it, write explicit invalidation, then watch after hours.",
     "I <b>never</b> place an order. You call it off.",
@@ -51,15 +80,15 @@ export function welcomeText(): string {
 
 export function helpText(): string {
   return [
-    "<b>HOW ROOK WORKS</b>",
+    heading("HOW ROOK WORKS"),
     "1. NEW THESIS \u2192 horizon \u2192 side \u2192 market",
     "2. Scout pulls live Bitget public numbers (no LLM prices)",
     "3. Bull and Bear argue. Judge writes the thesis and a hard invalidation price",
     "4. WATCH THIS monitors the thesis. CALL LIVE opens a directional paper call",
-    "5. MY PAPER is open calls (max 10). RECORDS is stopped and invalidated calls",
+    "5. MY PAPER is open calls (max 10). RECORDS is stopped, invalidated, and liquidated calls",
     "6. If the invalidation price is crossed I tell you. I never place a Bitget order",
     "",
-    "<b>Bitget AI Base Camp S2</b> \u2014 track: AI Trading Desk (research workbench / decision stress testing). No execution.",
+    `${heading("Bitget AI Base Camp S2")} \u2014 track: AI Trading Desk (research workbench / decision stress testing). No execution.`,
     "",
     "Bare tickers like NVDA map to NVDAUSDT, then RNVDAUSDT (Bitget rToken style) if needed.",
     footer(),
@@ -68,10 +97,12 @@ export function helpText(): string {
 
 export function snapshotLine(s: MarketSnapshot): string {
   return [
-    `<b>${esc(s.symbol)}</b> last <b>${fmtNum(s.last)}</b>  24h ${fmtPct(s.change24hPct)}`,
-    `bid/ask ${fmtNum(s.bid)} / ${fmtNum(s.ask)}  hi/lo ${fmtNum(s.high24h)} / ${fmtNum(s.low24h)}`,
-    `vol24h ${fmtNum(s.volumeQuote, 0)} USDT  rvol ${fmtPct(s.realizedVol24hPct)}  SMA20 ${fmtNum(s.sma20)}`,
-    `<i>source ${esc(s.source)}</i>`,
+    `${instrument(s.symbol)} ${price(s.last)} \u00b7 24h ${fmtPct(s.change24hPct)}`,
+    `Bid/ask ${fmtNum(s.bid)} / ${fmtNum(s.ask)}`,
+    `High/low ${fmtNum(s.high24h)} / ${fmtNum(s.low24h)}`,
+    `Vol ${fmtNum(s.volumeQuote, 0)} USDT \u00b7 RVOL ${fmtPct(s.realizedVol24hPct)}`,
+    `SMA20 ${fmtNum(s.sma20)}`,
+    metadata(`source ${s.source}`),
   ].join("\n");
 }
 
@@ -80,45 +111,52 @@ export function thesisCard(report: JudgeReport, snapshot?: MarketSnapshot, prevC
     prevConf !== null && prevConf !== undefined && prevConf !== report.confidence
       ? `${prevConf} \u2192 ${report.confidence}`
       : String(report.confidence);
+  const last = snapshot?.last ?? null;
+  const invRel = last != null ? invRelationLabel(Number(last), report.invalidation_price) : "";
   const lines = [
-    `<b>ROOK REPORT // ${esc(report.symbol)}</b>`,
-    `${esc(report.horizon)} \u00b7 bias <b>${esc(report.bias.toUpperCase())}</b> \u00b7 confidence <b>${esc(conf)}</b> \u00b7 evidence ${report.evidence_quality}`,
-    `action <b>${esc(report.action)}</b>`,
+    heading("ROOK REPORT"),
+    `${instrument(report.symbol)} \u00b7 ${esc(report.horizon)}`,
+    "",
+    `Bias ${emphasis(report.bias.toUpperCase())}`,
+    `Confidence ${emphasis(conf)} \u00b7 Evidence ${emphasis(report.evidence_quality)}`,
+    `Action ${emphasis(report.action.toUpperCase())}`,
     snapshot ? snapshotLine(snapshot) : "",
     "",
-    `<b>STRATEGY</b>`,
+    heading("STRATEGY"),
     esc(report.strategy || report.reason || "\u2014"),
     "",
-    `<b>INVALIDATION</b> ${fmtNum(report.invalidation_price)}`,
+    heading("INVALIDATION"),
+    `${price(report.invalidation_price)}${invRel && invRel !== "n/a" ? ` \u00b7 ${esc(invRel)}` : ""}`,
     esc(report.invalidation_note || "\u2014"),
     "",
-    `<b>WHY</b>`,
+    heading("WHY"),
     esc(report.reason || "\u2014"),
   ];
   if (report.parse_error && report.raw_text) {
-    lines.push("", "<b>UNPARSED JUDGE TEXT</b>", `<pre>${esc(report.raw_text.slice(0, 1500))}</pre>`);
+    lines.push("", heading("UNPARSED JUDGE TEXT"), `<pre>${esc(report.raw_text.slice(0, 1500))}</pre>`);
   }
   lines.push(footer());
   return lines.filter((x, i, a) => x !== "" || a[i - 1] !== "").join("\n");
 }
 
 export function sectionCard(title: string, body: string): string {
-  return `<b>${esc(title)}</b>\n${esc(body || "\u2014")}${footer()}`;
+  return `${heading(title)}\n${esc(body || "\u2014")}${footer()}`;
 }
 
 export function wrongCard(report: JudgeReport): string {
   return [
-    `<b>I AM WRONG IF \u2014 ${esc(report.symbol)}</b>`,
+    `${heading("I AM WRONG IF")} \u2014 ${instrument(report.symbol)}`,
+    `Deterministic close ${price(report.invalidation_price)}`,
+    esc(report.invalidation_note || ""),
+    "",
+    heading("WARNING SIGNS"),
     bullets(report.i_am_wrong_if),
     "",
-    `<b>RISKS</b>`,
+    heading("RISKS"),
     bullets(report.risks),
     "",
-    `<b>CATALYSTS</b>`,
+    heading("CATALYSTS"),
     bullets(report.catalysts),
-    "",
-    `Invalidation price: <b>${fmtNum(report.invalidation_price)}</b>`,
-    esc(report.invalidation_note || ""),
     footer(),
   ].join("\n");
 }
@@ -128,22 +166,22 @@ export function watchesText(rows: WatchRow[]): string {
   const body = rows
     .map((w, i) => {
       const inv = w.invalidation?.price ?? w.last_thesis?.invalidation_price ?? null;
-      const dist = distancePct(Number(w.last_price ?? 0), inv);
+      const last = Number(w.last_price ?? 0);
       return [
-        `<b>${i + 1}. ${esc(w.symbol)}</b> ${esc(w.horizon)} ${esc(String(w.side))}`,
-        `confidence ${w.last_confidence ?? "?"} \u00b7 action ${esc(w.last_action ?? "?")} \u00b7 last ${fmtNum(Number(w.last_price))}`,
-        `invalidation ${fmtNum(inv)} \u00b7 dist ${fmtPct(dist)}`,
+        `${i + 1}. ${instrument(w.symbol)} \u00b7 ${esc(w.horizon)} \u00b7 ${esc(String(w.side))}`,
+        `Confidence ${w.last_confidence ?? "?"} \u00b7 Action ${esc(w.last_action ?? "?")} \u00b7 Last ${fmtNum(last)}`,
+        `Invalidation ${fmtNum(inv)} \u00b7 ${invRelationLabel(last, inv)}`,
       ].join("\n");
     })
     .join("\n\n");
-  return `<b>ACTIVE WATCHES</b>\n\n${body}${footer()}`;
+  return `${heading("ACTIVE WATCHES")}\n\n${body}${footer()}`;
 }
 
 export function settingsText(alertsOn: boolean, every: string): string {
   return [
-    "<b>SETTINGS</b>",
-    `Alerts: <b>${alertsOn ? "ON" : "OFF"}</b>`,
-    `Preferred check cadence: <b>${esc(every)}</b>`,
+    heading("SETTINGS"),
+    `Alerts: ${emphasis(alertsOn ? "ON" : "OFF")}`,
+    `Preferred check cadence: ${emphasis(every)}`,
     "This is your preference for how often Rook should re-read open watches.",
     footer(),
   ].join("\n");
@@ -163,9 +201,9 @@ export function alertText(opts: {
       ? `${opts.prevConf} \u2192 ${opts.nextConf}`
       : String(opts.nextConf);
   return [
-    `<b>WATCH ALERT // ${esc(opts.symbol)}</b>`,
-    `action <b>${esc(opts.action)}</b> \u00b7 confidence <b>${esc(conf)}</b>`,
-    `last ${fmtNum(opts.last)} \u00b7 invalidation ${fmtNum(opts.inv)}`,
+    `${heading("WATCH ALERT")} \u2014 ${instrument(opts.symbol)}`,
+    `Action ${emphasis(opts.action.toUpperCase())} \u00b7 Confidence ${emphasis(conf)}`,
+    `Last ${fmtNum(opts.last)} \u00b7 Invalidation ${fmtNum(opts.inv)} \u00b7 ${invRelationLabel(opts.last, opts.inv)}`,
     esc(opts.reason),
     footer(),
   ].join("\n");
