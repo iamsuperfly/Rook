@@ -2,7 +2,7 @@ import { DISCLAIMER, type JudgeReport, type MarketSnapshot, type WatchRow } from
 import { distancePct } from "@/lib/bitget/scout";
 
 export function esc(s: string): string {
-  return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function heading(title: string): string {
