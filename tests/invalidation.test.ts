@@ -108,4 +108,31 @@ describe("display / store / score agree", () => {
     expect(crossed.status).toBe("invalidated");
     expect(crossed.close_reason).toContain("87400");
   });
+
+  it("rewrites a plausible but side-wrong note to the stored close line", () => {
+    const report = applyAuthoritativeInvalidation(
+      {
+        symbol: "BTCUSDT",
+        horizon: "24h",
+        bias: "short",
+        confidence: 55,
+        strategy: "Monitor acceptance below the range.",
+        bull_summary: "",
+        bear_summary: "",
+        catalysts: [],
+        risks: [],
+        i_am_wrong_if: ["Price breaking above ~87,400"],
+        invalidation_price: 85863.93,
+        invalidation_note: "Short invalidates at or below the last print.",
+        action: "watch",
+        reason: "",
+        evidence_quality: 58,
+      } as JudgeReport,
+      { last: 85863.93, high24h: 87393.73, low24h: 83891.32, sma20: 85973.63 },
+    );
+    expect(report.invalidation_price).toBe(87393.73);
+    expect(report.invalidation_note).toMatch(/at or above 87393\.73/);
+    expect(report.invalidation_note).not.toMatch(/at or below/);
+    expect(report.i_am_wrong_if[0]).toMatch(/87,400/);
+  });
 });
