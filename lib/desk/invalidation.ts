@@ -83,14 +83,8 @@ export function applyAuthoritativeInvalidation(
   });
   report.invalidation_price = price;
   if (side && price != null) {
-    const note = report.invalidation_note ?? "";
-    const contradicts =
-      /at or below the snapshot last/i.test(note) ||
-      /closes at or below/i.test(note) ||
-      (side === "short" && /below the snapshot/i.test(note));
-    if (!note.trim() || contradicts) {
-      report.invalidation_note = deterministicInvalidationNote(side, price, snapshot.last);
-    }
+    // Note must describe the same line automation uses — never a leftover opposite-side phrase.
+    report.invalidation_note = deterministicInvalidationNote(side, price, snapshot.last);
   }
   return report;
 }
