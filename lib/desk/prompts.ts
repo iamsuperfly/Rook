@@ -27,10 +27,14 @@ evidence_quality (0-100) is how strong and usable the available evidence is. Thi
 
 strategy must describe thesis conditions, not trade instructions.
 Write what would strengthen the case, what would weaken it, and what evidence is missing.
-Do NOT say "maintain exposure", "scale in", "add size", "take profit", or imply an order exists.
+Do NOT say "maintain exposure", "scale in", "add size", "take profit", "increase exposure", "reduce exposure", or imply an order exists.
 
-invalidation_price must be a number or null, derived from the snapshot last (never invent last).
-This price is the deterministic close line. i_am_wrong_if can list extra warning signs, but the price is what the desk evaluates.
+invalidation_price is the ONE deterministic close line the desk will evaluate.
+Never invent last. Never copy snapshot last as the invalidation.
+LONG: price must be BELOW snapshot last (adverse drop).
+SHORT: price must be ABOVE snapshot last (adverse rise). Prefer 24h high / a clear resistance print.
+i_am_wrong_if may list volume spikes, news, or order-flow warnings. Those are NOT automatic close conditions.
+invalidation_note must describe the same price and the same side (short = at or above; long = at or below).
 action must be one of: watch | reject | call_off | hold.
 If evidence is thin, lower evidence_quality and lean reject or hold.`;
 

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import type { DebateBundle, Horizon, JudgeReport, MarketSnapshot, Side } from "@/lib/types";
+import { applyAuthoritativeInvalidation } from "./invalidation";
 import { parseJudgeReport } from "./judge";
 
 export function crewEnabled(): boolean {
@@ -52,7 +53,7 @@ export async function runCrewPython(opts: {
         reject(new Error(`crew_exit_${code}:${err.slice(0, 400)}`));
         return;
       }
-      resolve(parseJudgeReport(out, opts.symbol, opts.horizon));
+      resolve(applyAuthoritativeInvalidation(parseJudgeReport(out, opts.symbol, opts.horizon), opts.snapshot));
     });
     child.stdin.write(payload);
     child.stdin.end();

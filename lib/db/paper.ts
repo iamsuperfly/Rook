@@ -6,6 +6,7 @@ import {
   liquidationPrice,
   paperExposure,
 } from "@/lib/desk/paper-sim";
+import { applyAuthoritativeInvalidation, paperInvalidationBlob } from "@/lib/desk/invalidation";
 import { PaperFundsError, creditAvailable, debitAvailable } from "./paper-wallet";
 import { getServiceDb } from "./supabase";
 import { ensureUser } from "./watches";
@@ -16,7 +17,6 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Map applied-005 `liquidation_price` onto the in-memory alias. */
 export function storedLiqPrice(run: Pick<PaperRunRow, "liquidation_price" | "liq_price">): number | null {
   return numOrNull(run.liquidation_price ?? run.liq_price);
 }
@@ -52,33 +52,19 @@ export async function openPaperRun(opts: {
   marginUsdt: number;
   leverage: number;
 }): Promise<PaperRunRow> {
-  if (!isPaperDir(opts.side)) {
-    throw new Error("paper_side_required");
-  }
+  if (!isPaperDir(opts.side)) throw new Error("paper_side_required");
   if (!Number.isFinite(opts.marginUsdt) || opts.marginUsdt < PAPER_MIN_MARGIN) {
     throw new PaperFundsError("margin_too_small");
   }
-  if (!isPaperLeverage(opts.leverage)) {
-    throw new PaperFundsError("bad_leverage");
-  }
+  if (!isPaperLeverage(opts.leverage)) throw new PaperFundsError("bad_leverage");
   await ensureUser(opts.chatId);
-  const openCount = await countOpenPaperRuns(opts.chatId);
-  if (openCount >= MAX_OPEN_PAPER) throw new PaperLimitError();
-
+  if ((await countOpenPaperRuns(opts.chatId)) >= MAX_OPEN_PAPER) throw new PaperLimitError();
   await debitAvailable(opts.chatId, opts.marginUsdt);
-
   const exposure = paperExposure(opts.marginUsdt, opts.leverage);
-  const liq = liquidationPrice({
-    side: opts.side,
-    entry: opts.entry,
-    leverage: opts.leverage,
-  });
+  const liq = liquidationPrice({ side: opts.side, entry: opts.entry, leverage: opts.leverage });
+  const report = applyAuthoritativeInvalidation(opts.report, { last: opts.entry }, opts.side as "long" | "short");
+  const inv: InvalidationBlob = paperInvalidationBlob(report);
   const db = getServiceDb();
-  const inv: InvalidationBlob = {
-    price: opts.report.invalidation_price,
-    note: opts.report.invalidation_note,
-    rules: opts.report.i_am_wrong_if,
-  };
   const { data, error } = await db
     .from("paper_runs")
     .insert({
@@ -96,15 +82,14 @@ export async function openPaperRun(opts: {
       leverage: opts.leverage,
       exposure_usdt: exposure,
       liquidation_price: liq,
-      thesis: opts.report,
+      thesis: report,
       invalidation: inv,
     })
     .select("*")
     .single();
   if (error) {
     await creditAvailable(opts.chatId, opts.marginUsdt).catch(() => undefined);
-    const msg = error.message ?? "";
-    if (msg.includes("paper_open_limit")) throw new PaperLimitError();
+    if ((error.message ?? "").includes("paper_open_limit")) throw new PaperLimitError();
     throw error;
   }
   return asPaperRun(data as Record<string, unknown>);
@@ -117,25 +102,15 @@ export async function addPaperMargin(id: string, chatId: number, amount: number)
   if (run.status !== "open") throw new PaperFundsError("paper_not_open");
   const current = Number(run.margin_usdt ?? 0);
   if (current <= 0) throw new PaperFundsError("legacy_unlevered");
-
   await debitAvailable(chatId, amount);
   const nextMargin = current + amount;
   const exposure = Number(run.exposure_usdt ?? paperExposure(current, Number(run.leverage ?? 1)));
   const nextLev = exposure / nextMargin;
-  const liq = liquidationPrice({
-    side: run.side,
-    entry: Number(run.entry_price),
-    leverage: nextLev,
-  });
+  const liq = liquidationPrice({ side: run.side, entry: Number(run.entry_price), leverage: nextLev });
   const db = getServiceDb();
   const { data, error } = await db
     .from("paper_runs")
-    .update({
-      margin_usdt: nextMargin,
-      leverage: nextLev,
-      liquidation_price: liq,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ margin_usdt: nextMargin, leverage: nextLev, liquidation_price: liq, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("status", "open")
     .select("*")
@@ -159,14 +134,9 @@ export async function settlePaperClose(opts: {
   const run = await getPaperRun(opts.id);
   if (!run || run.chat_id !== opts.chatId) throw new Error("paper_not_found");
   if (run.status !== "open") return run;
-
   const margin = Number(run.margin_usdt ?? 0);
   const realized = opts.pnlUsdt ?? 0;
-  if (margin > 0) {
-    const credit = Math.max(0, margin + realized);
-    await creditAvailable(opts.chatId, credit);
-  }
-
+  if (margin > 0) await creditAvailable(opts.chatId, Math.max(0, margin + realized));
   return updatePaperRun(opts.id, {
     status: opts.status,
     last_price: opts.last,
