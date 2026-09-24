@@ -104,6 +104,17 @@ export interface UserRow {
   alerts_on: boolean;
   check_every: CheckEvery;
   created_at: string;
+  telegram_user_id?: number | null;
+  username?: string | null;
+  first_name?: string | null;
+  photo_file_id?: string | null;
+  photo_updated_at?: string | null;
+}
+
+export interface TelegramProfilePatch {
+  telegramUserId?: number;
+  username?: string | null;
+  firstName?: string | null;
 }
 
 export type ConvStep =

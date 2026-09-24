@@ -1,14 +1,78 @@
-import type { CheckEvery, Horizon, InvalidationBlob, JudgeReport, UserRow, WatchRow } from "@/lib/types";
+import type {
+  Horizon,
+  InvalidationBlob,
+  JudgeReport,
+  TelegramProfilePatch,
+  UserRow,
+  WatchRow,
+} from "@/lib/types";
+import { normalizePublicUsername } from "@/lib/web/site";
+import { fetchTelegramPhotoFileId } from "@/lib/telegram/profile";
 import { getServiceDb } from "./supabase";
 
-export async function ensureUser(chatId: number): Promise<UserRow> {
+const PHOTO_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function ensureUser(chatId: number, profile?: TelegramProfilePatch): Promise<UserRow> {
   const db = getServiceDb();
   const { data: existing, error: readErr } = await db.from("users").select("*").eq("chat_id", chatId).maybeSingle();
   if (readErr) throw readErr;
-  if (existing) return existing as UserRow;
-  const { data, error } = await db.from("users").insert({ chat_id: chatId }).select("*").single();
+  if (!existing) {
+    const { data, error } = await db
+      .from("users")
+      .insert({
+        chat_id: chatId,
+        telegram_user_id: profile?.telegramUserId ?? chatId,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    if (profile) {
+      await touchPublicProfile(chatId, profile, data as UserRow).catch((err) => console.warn("[users] profile", err));
+    }
+    return (await getUser(chatId)) ?? (data as UserRow);
+  }
+  if (profile) {
+    await touchPublicProfile(chatId, profile, existing as UserRow).catch((err) => console.warn("[users] profile", err));
+  }
+  return ((await getUser(chatId)) ?? existing) as UserRow;
+}
+
+export async function touchPublicProfile(
+  chatId: number,
+  profile: TelegramProfilePatch,
+  current?: UserRow | null,
+): Promise<void> {
+  const db = getServiceDb();
+  const username = normalizePublicUsername(profile.username ?? null);
+  if (username) {
+    await db.from("users").update({ username: null }).neq("chat_id", chatId).ilike("username", username);
+  }
+  const patch: Record<string, unknown> = {
+    telegram_user_id: profile.telegramUserId ?? chatId,
+  };
+  if (profile.username !== undefined) patch.username = username;
+  if (profile.firstName !== undefined) patch.first_name = profile.firstName;
+  const stale =
+    !current?.photo_updated_at || Date.now() - new Date(current.photo_updated_at).getTime() > PHOTO_TTL_MS;
+  if (stale || !current?.photo_file_id) {
+    const userId = profile.telegramUserId ?? current?.telegram_user_id ?? chatId;
+    const photo = await fetchTelegramPhotoFileId(userId);
+    if (photo) {
+      patch.photo_file_id = photo;
+      patch.photo_updated_at = new Date().toISOString();
+    }
+  }
+  const { error } = await db.from("users").update(patch).eq("chat_id", chatId);
   if (error) throw error;
-  return data as UserRow;
+}
+
+export async function getUserByUsername(username: string): Promise<UserRow | null> {
+  const slug = normalizePublicUsername(username);
+  if (!slug) return null;
+  const db = getServiceDb();
+  const { data, error } = await db.from("users").select("*").ilike("username", slug).maybeSingle();
+  if (error) throw error;
+  return (data as UserRow) ?? null;
 }
 
 export async function getUser(chatId: number): Promise<UserRow | null> {
@@ -133,10 +197,4 @@ export async function updateWatchSnapshot(
     .single();
   if (error) throw error;
   return data as WatchRow;
-}
-
-export function nextInterval(pref: CheckEvery): CheckEvery {
-  if (pref === "15m") return "1h";
-  if (pref === "1h") return "4h";
-  return "15m";
 }
