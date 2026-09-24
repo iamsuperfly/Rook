@@ -68,7 +68,7 @@ export function footer(): string {
 
 export function welcomeText(): string {
   return [
-    `${heading("ROOK")} \u2014 adversarial desk for Bitget tokenized US names / USDT markets.`,
+    `${heading("ROOK")} — adversarial desk for Bitget tokenized US names / USDT markets.`,
     "",
     "I build a thesis, attack it, write explicit invalidation, then watch after hours.",
     "I <b>never</b> place an order. You call it off.",
@@ -81,14 +81,14 @@ export function welcomeText(): string {
 export function helpText(): string {
   return [
     heading("HOW ROOK WORKS"),
-    "1. NEW THESIS \u2192 horizon \u2192 side \u2192 market",
+    "1. NEW THESIS → horizon → side → market",
     "2. Scout pulls live Bitget public numbers (no LLM prices)",
     "3. Bull and Bear argue. Judge writes the thesis and a hard invalidation price",
     "4. WATCH THIS monitors the thesis. CALL LIVE opens a directional paper call",
     "5. MY PAPER is open calls (max 10). RECORDS is stopped, invalidated, and liquidated calls",
-    "6. If the invalidation price is crossed I tell you. I never place a Bitget order",
+    "6. Open watches are checked every 15 minutes. If the stored invalidation price is crossed I tell you. I never place a Bitget order",
     "",
-    `${heading("Bitget AI Base Camp S2")} \u2014 track: AI Trading Desk (research workbench / decision stress testing). No execution.`,
+    `${heading("Bitget AI Base Camp S2")} — track: AI Trading Desk (research workbench / decision stress testing). No execution.`,
     "",
     "Bare tickers like NVDA map to NVDAUSDT, then RNVDAUSDT (Bitget rToken style) if needed.",
     footer(),
@@ -97,10 +97,10 @@ export function helpText(): string {
 
 export function snapshotLine(s: MarketSnapshot): string {
   return [
-    `${instrument(s.symbol)} ${price(s.last)} \u00b7 24h ${fmtPct(s.change24hPct)}`,
+    `${instrument(s.symbol)} ${price(s.last)} · 24h ${fmtPct(s.change24hPct)}`,
     `Bid/ask ${fmtNum(s.bid)} / ${fmtNum(s.ask)}`,
     `High/low ${fmtNum(s.high24h)} / ${fmtNum(s.low24h)}`,
-    `Vol ${fmtNum(s.volumeQuote, 0)} USDT \u00b7 RVOL ${fmtPct(s.realizedVol24hPct)}`,
+    `Vol ${fmtNum(s.volumeQuote, 0)} USDT · RVOL ${fmtPct(s.realizedVol24hPct)}`,
     `SMA20 ${fmtNum(s.sma20)}`,
     metadata(`source ${s.source}`),
   ].join("\n");
@@ -109,28 +109,28 @@ export function snapshotLine(s: MarketSnapshot): string {
 export function thesisCard(report: JudgeReport, snapshot?: MarketSnapshot, prevConf?: number | null): string {
   const conf =
     prevConf !== null && prevConf !== undefined && prevConf !== report.confidence
-      ? `${prevConf} \u2192 ${report.confidence}`
+      ? `${prevConf} → ${report.confidence}`
       : String(report.confidence);
   const last = snapshot?.last ?? null;
   const invRel = last != null ? invRelationLabel(Number(last), report.invalidation_price) : "";
   const lines = [
     heading("ROOK REPORT"),
-    `${instrument(report.symbol)} \u00b7 ${esc(report.horizon)}`,
+    `${instrument(report.symbol)} · ${esc(report.horizon)}`,
     "",
     `Bias ${emphasis(report.bias.toUpperCase())}`,
-    `Confidence ${emphasis(conf)} \u00b7 Evidence ${emphasis(report.evidence_quality)}`,
+    `Confidence ${emphasis(conf)} · Evidence ${emphasis(report.evidence_quality)}`,
     `Action ${emphasis(report.action.toUpperCase())}`,
     snapshot ? snapshotLine(snapshot) : "",
     "",
     heading("STRATEGY"),
-    esc(report.strategy || report.reason || "\u2014"),
+    esc(report.strategy || report.reason || "—"),
     "",
     heading("INVALIDATION"),
-    `${price(report.invalidation_price)}${invRel && invRel !== "n/a" ? ` \u00b7 ${esc(invRel)}` : ""}`,
-    esc(report.invalidation_note || "\u2014"),
+    `${price(report.invalidation_price)}${invRel && invRel !== "n/a" ? ` · ${esc(invRel)}` : ""}`,
+    esc(report.invalidation_note || "—"),
     "",
     heading("WHY"),
-    esc(report.reason || "\u2014"),
+    esc(report.reason || "—"),
   ];
   if (report.parse_error && report.raw_text) {
     lines.push("", heading("UNPARSED JUDGE TEXT"), `<pre>${esc(report.raw_text.slice(0, 1500))}</pre>`);
@@ -140,12 +140,12 @@ export function thesisCard(report: JudgeReport, snapshot?: MarketSnapshot, prevC
 }
 
 export function sectionCard(title: string, body: string): string {
-  return `${heading(title)}\n${esc(body || "\u2014")}${footer()}`;
+  return `${heading(title)}\n${esc(body || "—")}${footer()}`;
 }
 
 export function wrongCard(report: JudgeReport): string {
   return [
-    `${heading("I AM WRONG IF")} \u2014 ${instrument(report.symbol)}`,
+    `${heading("I AM WRONG IF")} — ${instrument(report.symbol)}`,
     `Deterministic close ${price(report.invalidation_price)}`,
     esc(report.invalidation_note || ""),
     "",
@@ -168,21 +168,20 @@ export function watchesText(rows: WatchRow[]): string {
       const inv = w.invalidation?.price ?? w.last_thesis?.invalidation_price ?? null;
       const last = Number(w.last_price ?? 0);
       return [
-        `${i + 1}. ${instrument(w.symbol)} \u00b7 ${esc(w.horizon)} \u00b7 ${esc(String(w.side))}`,
-        `Confidence ${w.last_confidence ?? "?"} \u00b7 Action ${esc(w.last_action ?? "?")} \u00b7 Last ${fmtNum(last)}`,
-        `Invalidation ${fmtNum(inv)} \u00b7 ${invRelationLabel(last, inv)}`,
+        `${i + 1}. ${instrument(w.symbol)} · ${esc(w.horizon)} · ${esc(String(w.side))}`,
+        `Confidence ${w.last_confidence ?? "?"} · Action ${esc(w.last_action ?? "?")} · Last ${fmtNum(last)}`,
+        `Invalidation ${fmtNum(inv)} · ${invRelationLabel(last, inv)}`,
       ].join("\n");
     })
     .join("\n\n");
   return `${heading("ACTIVE WATCHES")}\n\n${body}${footer()}`;
 }
 
-export function settingsText(alertsOn: boolean, every: string): string {
+export function settingsText(alertsOn: boolean): string {
   return [
     heading("SETTINGS"),
     `Alerts: ${emphasis(alertsOn ? "ON" : "OFF")}`,
-    `Preferred check cadence: ${emphasis(every)}`,
-    "This is your preference for how often Rook should re-read open watches.",
+    "Open watches and paper calls are checked automatically every 15 minutes.",
     footer(),
   ].join("\n");
 }
@@ -198,12 +197,12 @@ export function alertText(opts: {
 }): string {
   const conf =
     opts.prevConf !== null && opts.prevConf !== opts.nextConf
-      ? `${opts.prevConf} \u2192 ${opts.nextConf}`
+      ? `${opts.prevConf} → ${opts.nextConf}`
       : String(opts.nextConf);
   return [
-    `${heading("WATCH ALERT")} \u2014 ${instrument(opts.symbol)}`,
-    `Action ${emphasis(opts.action.toUpperCase())} \u00b7 Confidence ${emphasis(conf)}`,
-    `Last ${fmtNum(opts.last)} \u00b7 Invalidation ${fmtNum(opts.inv)} \u00b7 ${invRelationLabel(opts.last, opts.inv)}`,
+    `${heading("WATCH ALERT")} — ${instrument(opts.symbol)}`,
+    `Action ${emphasis(opts.action.toUpperCase())} · Confidence ${emphasis(conf)}`,
+    `Last ${fmtNum(opts.last)} · Invalidation ${fmtNum(opts.inv)} · ${invRelationLabel(opts.last, opts.inv)}`,
     esc(opts.reason),
     footer(),
   ].join("\n");
