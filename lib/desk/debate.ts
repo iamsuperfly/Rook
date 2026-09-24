@@ -1,7 +1,6 @@
 import type { DebateBundle, Horizon, JudgeReport, MarketSnapshot, Side } from "@/lib/types";
 import { collectSignalBrief } from "@/lib/bitget/signal";
 import { scoutSymbol } from "@/lib/bitget/scout";
-import { debateViaCrew } from "./crew-bridge";
 import { groqComplete } from "./groq";
 import { applyAuthoritativeInvalidation } from "./invalidation";
 import { parseJudgeReport } from "./judge";
@@ -33,15 +32,6 @@ export async function runDebate(opts: {
 }): Promise<DebateBundle> {
   const snapshot = opts.snapshot ?? (await scoutSymbol(opts.symbol));
   const news = await runNewsBrief(snapshot.symbol);
-
-  const viaCrew = await debateViaCrew({
-    symbol: snapshot.symbol,
-    horizon: opts.horizon,
-    side: opts.side,
-    snapshot,
-    news,
-  });
-  if (viaCrew) return viaCrew;
 
   const bullBear = await groqComplete({
     org: "A",
