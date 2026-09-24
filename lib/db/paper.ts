@@ -185,6 +185,12 @@ export async function getPaperRun(id: string): Promise<PaperRunRow | null> {
   return data ? asPaperRun(data as Record<string, unknown>) : null;
 }
 
+export async function getPaperRunForChat(id: string, chatId: number): Promise<PaperRunRow | null> {
+  const row = await getPaperRun(id);
+  if (!row || row.chat_id !== chatId) return null;
+  return row;
+}
+
 export async function updatePaperRun(
   id: string,
   patch: Partial<

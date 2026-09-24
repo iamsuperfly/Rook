@@ -1,0 +1,40 @@
+:root {
+  --bg: #07080c;
+  --ink: #e8e4d8;
+  --muted: #9a917c;
+  --line: #2a271f;
+  --accent: #d7ff3c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+a { color: inherit; }
+
+.rook-page { max-width: 720px; margin: 0 auto; padding: 48px 24px 96px; }
+.rook-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 32px; }
+.rook-mark { letter-spacing: 0.22em; font-weight: 700; text-decoration: none; color: var(--accent); }
+.rook-kicker { letter-spacing: 0.16em; font-size: 12px; color: var(--muted); margin: 0; }
+.rook-profile { display: flex; gap: 16px; align-items: center; margin-bottom: 36px; }
+.rook-profile h1, .rook-page h1 { margin: 0 0 6px; font-size: 28px; }
+.rook-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #16140f; border: 1px solid var(--line); }
+.rook-avatar-fallback { display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--accent); }
+.rook-muted { color: var(--muted); margin: 0; }
+.rook-page h2 { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 28px 0 12px; }
+.rook-list { list-style: none; padding: 0; margin: 0; }
+.rook-row { display: block; text-decoration: none; border-top: 1px solid var(--line); padding: 14px 0; }
+.rook-row-top, .rook-row-sub { display: flex; justify-content: space-between; gap: 12px; }
+.rook-sym { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.rook-status, .rook-status-lg { letter-spacing: 0.08em; font-weight: 700; }
+.rook-status-lg { margin: 12px 0 24px; }
+.rook-meta { color: var(--muted); font-size: 13px; font-style: italic; margin-top: 6px; }
+.rook-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; margin: 0 0 28px; }
+.rook-facts dt { color: var(--muted); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+.rook-facts dd { margin: 4px 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.rook-page p { line-height: 1.55; }
