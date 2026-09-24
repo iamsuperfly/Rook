@@ -35,7 +35,7 @@ export const BTN = {
   addMargin: "ADD MARGIN",
   stress: "STRESS TEST",
   alerts: "ALERTS ON/OFF",
-  interval: "CHECK EVERY 15m / 1h / 4h",
+  seeMore: "SEE MORE \u2192",
 } as const;
 
 export type BtnLabel = (typeof BTN)[keyof typeof BTN];
@@ -68,7 +68,7 @@ export function mainReplyKeyboard() {
     ],
     resize_keyboard: true,
     is_persistent: false,
-    input_field_placeholder: "Use the buttons — Rook never places an order",
+    input_field_placeholder: "Use the buttons \u2014 Rook never places an order",
   };
 }
 
@@ -100,7 +100,7 @@ export function deskTextRoute(text: string): DeskTextRoute {
   return "other";
 }
 
-function inline(rows: Array<Array<{ text: string; callback_data: string }>>) {
+function inline(rows: Array<Array<{ text: string; callback_data?: string; url?: string }>>) {
   return { inline_keyboard: rows };
 }
 
@@ -125,7 +125,6 @@ export const CB = {
   records: "nav:records",
   myPaper: "nav:paper",
   setAlerts: "set:alerts",
-  setEvery: "set:every",
 } as const;
 
 export function horizonKeyboard() {
@@ -278,7 +277,6 @@ export function openPaperEmptyKeyboard() {
 export function settingsKeyboard() {
   return inline([
     [{ text: BTN.alerts, callback_data: CB.setAlerts }],
-    [{ text: BTN.interval, callback_data: CB.setEvery }],
     [{ text: BTN.mainMenu, callback_data: CB.menu }],
   ]);
 }
@@ -302,10 +300,11 @@ export function paperListKeyboard(ids: string[]) {
   return inline(rows);
 }
 
-export function recordsListKeyboard(ids: string[]) {
-  const rows = ids.slice(0, 8).map((id, i) => [
+export function recordsListKeyboard(ids: string[], seeMoreUrl?: string | null) {
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = ids.slice(0, 5).map((id, i) => [
     { text: `RECORD #${i + 1}`, callback_data: CB.paperAct("open", id) },
   ]);
+  if (seeMoreUrl) rows.push([{ text: BTN.seeMore, url: seeMoreUrl }]);
   rows.push([{ text: BTN.myPaper, callback_data: CB.myPaper }]);
   rows.push([{ text: BTN.mainMenu, callback_data: CB.menu }]);
   return inline(rows);
