@@ -9,7 +9,6 @@ import {
   getWatch,
   latestWatch,
   listActiveWatches,
-  nextInterval,
   updateUser,
   upsertWatch,
 } from "@/lib/db/watches";
@@ -27,7 +26,6 @@ import {
   wrongCard,
 } from "./format";
 import {
-  BTN,
   CB,
   horizonKeyboard,
   isMainMenuLabel,
@@ -62,6 +60,15 @@ function isHorizon(v: string): v is Horizon {
 
 function isSide(v: string): v is Side {
   return v === "long" || v === "short" || v === "decide";
+}
+
+function profileFrom(from?: { id: number; username?: string; first_name?: string }) {
+  if (!from) return undefined;
+  return {
+    telegramUserId: from.id,
+    username: from.username ?? null,
+    firstName: from.first_name ?? null,
+  };
 }
 
 async function safeDb<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -123,7 +130,7 @@ async function handleText(msg: TgMessage): Promise<void> {
   if (!text) return;
 
   if (dbConfigured()) {
-    await safeDb(() => ensureUser(chatId), null);
+    await safeDb(() => ensureUser(chatId, profileFrom(msg.from)), null);
   }
 
   const route = deskTextRoute(text);
@@ -203,7 +210,7 @@ async function handleText(msg: TgMessage): Promise<void> {
 
 async function showSettings(chatId: number): Promise<void> {
   const user = await safeDb(() => getUser(chatId), null);
-  await sendMessage(chatId, settingsText(user?.alerts_on ?? true, user?.check_every ?? "15m"), {
+  await sendMessage(chatId, settingsText(user?.alerts_on ?? true), {
     reply_markup: settingsKeyboard(),
   });
 }
@@ -234,6 +241,9 @@ async function handleCallback(cb: TgCallback): Promise<void> {
   const chatId = cb.message?.chat.id ?? cb.from.id;
   const data = cb.data ?? "";
   await answerCallback(cb.id);
+  if (dbConfigured()) {
+    await safeDb(() => ensureUser(chatId, profileFrom(cb.from)), null);
+  }
 
   if (data === CB.menu) {
     await home(chatId);
@@ -346,19 +356,7 @@ async function handleCallback(cb: TgCallback): Promise<void> {
       const cur = await getUser(chatId);
       return updateUser(chatId, { alerts_on: !(cur?.alerts_on ?? true) });
     }, null);
-    await sendMessage(chatId, settingsText(user?.alerts_on ?? true, user?.check_every ?? "15m"), {
-      reply_markup: settingsKeyboard(),
-    });
-    return;
-  }
-
-  if (data === CB.setEvery) {
-    const user = await safeDb(async () => {
-      await ensureUser(chatId);
-      const cur = await getUser(chatId);
-      return updateUser(chatId, { check_every: nextInterval(cur?.check_every ?? "15m") });
-    }, null);
-    await sendMessage(chatId, settingsText(user?.alerts_on ?? true, user?.check_every ?? "15m"), {
+    await sendMessage(chatId, settingsText(user?.alerts_on ?? true), {
       reply_markup: settingsKeyboard(),
     });
   }
