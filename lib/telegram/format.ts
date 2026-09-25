@@ -2,7 +2,7 @@ import { DISCLAIMER, type JudgeReport, type MarketSnapshot, type WatchRow } from
 import { distancePct } from "@/lib/bitget/scout";
 
 export function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
 }
 
 export function heading(title: string): string {
@@ -59,7 +59,7 @@ export function invRelationLabel(last: number, inv: number | null | undefined): 
   if (d == null) return "n/a";
   if (Math.abs(d) < 0.005) return "at invalidation";
   const abs = Math.abs(d).toFixed(2);
-  return last > inv ? `${abs}% above invalidation` : `${abs}% below invalidation`;
+  return last > inv ? `invalidation ${abs}% below last` : `invalidation ${abs}% above last`;
 }
 
 export function footer(): string {
