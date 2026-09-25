@@ -173,7 +173,7 @@ export async function listClosedPaperRuns(chatId: number): Promise<PaperRunRow[]
     .eq("chat_id", chatId)
     .neq("status", "open")
     .order("updated_at", { ascending: false })
-    .limit(30);
+    .limit(50);
   if (error) throw error;
   return (data ?? []).map((row) => asPaperRun(row as Record<string, unknown>));
 }

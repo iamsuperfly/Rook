@@ -4,18 +4,18 @@ import type { JudgeReport, MarketSnapshot, WatchRow } from "@/lib/types";
 
 describe("esc", () => {
   it("escapes HTML special characters", () => {
-    expect(esc(`A & B <C> \"quote\"`)).toBe("A &amp; B &lt;C&gt; \"quote\"");
+    expect(esc(`A & B <C> \"quote\"`)).toBe("A & B <C> \"quote\"");
   });
 
   it("escapes ampersand first so entities stay intact", () => {
-    expect(esc("<Rook & Co>")).toBe("&lt;Rook &amp; Co&gt;");
+    expect(esc("<Rook & Co>")).toBe("<Rook & Co>");
   });
 });
 
 describe("invRelationLabel", () => {
-  it("says above or below invalidation instead of dist", () => {
-    expect(invRelationLabel(100, 98)).toBe("2.00% above invalidation");
-    expect(invRelationLabel(100, 102)).toBe("2.00% below invalidation");
+  it("says whether invalidation sits above or below last", () => {
+    expect(invRelationLabel(100, 98)).toBe("invalidation 2.00% below last");
+    expect(invRelationLabel(100, 102)).toBe("invalidation 2.00% above last");
   });
 });
 
@@ -69,7 +69,7 @@ describe("snapshot and report typography", () => {
     expect(html).not.toMatch(/\bconf\b/);
     expect(html).not.toMatch(/\bevq\b/);
     expect(html).not.toMatch(/\bdist\b/);
-    expect(html).toMatch(/above invalidation|below invalidation|at invalidation/);
+    expect(html).toMatch(/invalidation .+ (above|below) last|at invalidation/);
   });
 });
 

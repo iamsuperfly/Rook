@@ -11,7 +11,8 @@ import {
 } from "@/lib/db/paper";
 import { claimDaily, claimInitial, paperWalletView, PaperFundsError } from "@/lib/db/paper-wallet";
 import { dbConfigured } from "@/lib/db/supabase";
-import { getWatch } from "@/lib/db/watches";
+import { getUser, getWatch } from "@/lib/db/watches";
+import { normalizePublicUsername, publicRecordsUrl } from "@/lib/web/site";
 import { MAX_OPEN_PAPER, PaperLimitError, paperBias, resolveCallLiveSide, scorePaper } from "@/lib/desk/paper";
 import { PAPER_MIN_MARGIN, isPaperLeverage, paperExposure, stressPosition } from "@/lib/desk/paper-sim";
 import { describeError } from "@/lib/desk/errors";
@@ -119,8 +120,13 @@ export async function showRecords(chatId: number): Promise<void> {
   }
   try {
     const rows = await listClosedPaperRuns(chatId);
-    await sendMessage(chatId, recordsListText(rows), {
-      reply_markup: rows.length ? recordsListKeyboard(rows.map((r) => r.id)) : openPaperEmptyKeyboard(),
+    const user = await getUser(chatId);
+    const username = normalizePublicUsername(user?.username);
+    const seeMoreUrl = username ? publicRecordsUrl(username) : null;
+    await sendMessage(chatId, recordsListText(rows, { seeMoreUrl }), {
+      reply_markup: rows.length
+        ? recordsListKeyboard(rows.map((r) => r.id), seeMoreUrl)
+        : openPaperEmptyKeyboard(),
     });
   } catch (err) {
     console.error("[records]", err);
