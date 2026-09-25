@@ -4,6 +4,8 @@
   --muted: #9a917c;
   --line: #2a271f;
   --accent: #d7ff3c;
+  --up: #9dffb0;
+  --down: #ff8b7a;
 }
 
 * { box-sizing: border-box; }
@@ -20,21 +22,48 @@ a { color: inherit; }
 .rook-page { max-width: 720px; margin: 0 auto; padding: 48px 24px 96px; }
 .rook-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 32px; }
 .rook-mark { letter-spacing: 0.22em; font-weight: 700; text-decoration: none; color: var(--accent); }
-.rook-kicker { letter-spacing: 0.16em; font-size: 12px; color: var(--muted); margin: 0; }
-.rook-profile { display: flex; gap: 16px; align-items: center; margin-bottom: 36px; }
-.rook-profile h1, .rook-page h1 { margin: 0 0 6px; font-size: 28px; }
-.rook-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #16140f; border: 1px solid var(--line); }
+.rook-kicker { letter-spacing: 0.16em; font-size: 12px; color: var(--muted); margin: 0; text-decoration: none; }
+.rook-profile { display: flex; gap: 16px; align-items: center; margin-bottom: 28px; }
+.rook-profile h1, .rook-page h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.15; }
+.rook-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #16140f; border: 1px solid var(--line); flex-shrink: 0; }
 .rook-avatar-fallback { display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--accent); }
 .rook-muted { color: var(--muted); margin: 0; }
 .rook-page h2 { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 28px 0 12px; }
 .rook-list { list-style: none; padding: 0; margin: 0; }
-.rook-row { display: block; text-decoration: none; border-top: 1px solid var(--line); padding: 14px 0; }
-.rook-row-top, .rook-row-sub { display: flex; justify-content: space-between; gap: 12px; }
+.rook-row { display: block; text-decoration: none; border-top: 1px solid var(--line); padding: 16px 0; }
+.rook-row-top, .rook-row-sub { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.rook-row-sub { margin-top: 6px; font-size: 13px; }
 .rook-sym { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .rook-status, .rook-status-lg { letter-spacing: 0.08em; font-weight: 700; }
-.rook-status-lg { margin: 12px 0 24px; }
-.rook-meta { color: var(--muted); font-size: 13px; font-style: italic; margin-top: 6px; }
+.rook-status-lg { display: inline-block; margin: 0 0 24px; }
+.rook-meta { color: var(--muted); font-size: 13px; font-style: italic; margin-top: 8px; }
 .rook-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; margin: 0 0 28px; }
 .rook-facts dt { color: var(--muted); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
 .rook-facts dd { margin: 4px 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .rook-page p { line-height: 1.55; }
+.rook-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 8px; }
+.rook-stats div { border: 1px solid var(--line); padding: 12px 10px; }
+.rook-stat-n { display: block; font-size: 22px; font-weight: 700; }
+.rook-stat-l { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+.rook-pnl-up { color: var(--up); }
+.rook-pnl-down { color: var(--down); }
+.rook-pnl-flat { color: var(--ink); }
+.rook-badge { display: inline-block; margin-left: 8px; padding: 2px 7px; font-size: 10px; letter-spacing: 0.08em; border: 1px solid var(--line); }
+.rook-badge-liquidated { color: var(--down); border-color: #5a2a22; }
+.rook-badge-invalidated { color: #f0c36a; border-color: #4a3d1f; }
+.rook-badge-stopped { color: var(--muted); }
+.rook-badge-open { color: var(--accent); border-color: #3a4a12; }
+.rook-seq { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 0; margin: 0 0 28px; list-style: none; color: var(--muted); font-size: 11px; letter-spacing: 0.14em; }
+.rook-seq li { position: relative; }
+.rook-seq li + li::before { content: "→ "; color: var(--accent); }
+.rook-bullets { margin: 0; padding-left: 18px; color: var(--ink); }
+.rook-empty { border: 1px dashed var(--line); padding: 24px; color: var(--muted); }
+.rook-foot { margin-top: 48px; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 560px) {
+  .rook-page { padding: 28px 16px 72px; }
+  .rook-profile h1, .rook-page h1 { font-size: 22px; }
+  .rook-stats { grid-template-columns: repeat(2, 1fr); }
+  .rook-facts { grid-template-columns: 1fr; }
+  .rook-row-top, .rook-row-sub { flex-direction: column; gap: 4px; }
+}
