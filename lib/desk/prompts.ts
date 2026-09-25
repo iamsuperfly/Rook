@@ -28,6 +28,7 @@ evidence_quality (0-100) is how strong and usable the available evidence is. Thi
 strategy must describe thesis conditions, not trade instructions.
 Write what would strengthen the case, what would weaken it, and what evidence is missing.
 Do NOT say "maintain exposure", "scale in", "add size", "take profit", "increase exposure", "reduce exposure", or imply an order exists.
+Do not describe a price level as a future break if snapshot last has already printed through it.
 
 invalidation_price is the ONE deterministic close line the desk will evaluate.
 Never invent last. Never copy snapshot last as the invalidation.
