@@ -1,4 +1,5 @@
 import type {
+  ConfirmationBlob,
   Horizon,
   InvalidationBlob,
   JudgeReport,
@@ -6,6 +7,7 @@ import type {
   UserRow,
   WatchRow,
 } from "@/lib/types";
+import { confirmationBlobFromReport } from "@/lib/desk/confirmation";
 import { normalizePublicUsername } from "@/lib/web/site";
 import { fetchTelegramPhotoFileId } from "@/lib/telegram/profile";
 import { getServiceDb } from "./supabase";
@@ -108,6 +110,7 @@ export async function upsertWatch(opts: {
     note: opts.report.invalidation_note,
     rules: opts.report.i_am_wrong_if,
   };
+  const confirmation: ConfirmationBlob | null = confirmationBlobFromReport(opts.report);
   const { data: current, error: findErr } = await db
     .from("watches")
     .select("*")
@@ -129,6 +132,7 @@ export async function upsertWatch(opts: {
     last_action: opts.report.action,
     last_thesis: opts.report,
     invalidation: inv,
+    confirmation,
     updated_at: new Date().toISOString(),
   };
 
@@ -186,7 +190,7 @@ export async function deactivateWatch(id: string, action?: string): Promise<Watc
 
 export async function updateWatchSnapshot(
   id: string,
-  patch: Partial<Pick<WatchRow, "last_price" | "last_confidence" | "last_action" | "last_thesis" | "invalidation" | "active">>,
+  patch: Partial<Pick<WatchRow, "last_price" | "last_confidence" | "last_action" | "last_thesis" | "invalidation" | "confirmation" | "active">>,
 ): Promise<WatchRow> {
   const db = getServiceDb();
   const { data, error } = await db
