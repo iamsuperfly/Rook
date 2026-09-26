@@ -101,6 +101,7 @@ describe("judge prompt stays observational", () => {
     expect(JUDGE_SYSTEM).toMatch(/not trade instructions/i);
     expect(JUDGE_SYSTEM).toMatch(/scale in/);
     expect(JUDGE_SYSTEM).toMatch(/increase exposure/);
+    expect(JUDGE_SYSTEM).toMatch(/confirmation/);
   });
 });
 
@@ -114,6 +115,43 @@ describe("paper card", () => {
     expect(card).toContain("<code>BTCUSDT</code>");
     expect(card).not.toMatch(/Still no order on Bitget/);
     expect(card).not.toMatch(/\bLP\b/);
+  });
+
+  it("shows confirmation without treating it as an exit", () => {
+    const developing = paperCard(
+      openRun({
+        confirmation: {
+          trigger: "Price trades at or below 84000.",
+          i_am_right_if: "The range low gives way.",
+          price: 84000,
+          state: "developing",
+        },
+      }),
+    );
+    expect(developing).toContain("CONFIRMATION");
+    expect(developing).toContain("Still developing");
+    expect(developing).toContain("I'm right if");
+    expect(developing).not.toMatch(/take profit/i);
+    expect(developing).toMatch(/OPEN/);
+    expect(developing).not.toContain("PAPER RECORD");
+    expect(developing).not.toContain("CLOSE REASON");
+
+    const confirmed = paperCard(
+      openRun({
+        confirmation: {
+          trigger: "Price trades at or below 84000.",
+          i_am_right_if: "The range low gives way.",
+          price: 84000,
+          state: "confirmed",
+        },
+      }),
+    );
+    expect(confirmed).toContain("CONFIRMATION");
+    expect(confirmed).toContain("CONFIRMED");
+    expect(confirmed).toMatch(/OPEN/);
+    expect(confirmed).not.toContain("PAPER RECORD");
+    expect(confirmed).not.toContain("CLOSE REASON");
+    expect(confirmed).not.toMatch(/take profit/i);
   });
 });
 

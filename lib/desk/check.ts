@@ -4,13 +4,19 @@ import { dbConfigured } from "@/lib/db/supabase";
 import { listOpenPaperRuns, settlePaperClose, updatePaperRun } from "@/lib/db/paper";
 import { getUser, getWatch, listActiveWatches, updateWatchSnapshot } from "@/lib/db/watches";
 import { sendMessage } from "@/lib/telegram/bot";
-import { alertText } from "@/lib/telegram/format";
+import { alertText, confirmationAlertText } from "@/lib/telegram/format";
 import { paperCard } from "@/lib/telegram/paper-format";
 import { paperKeyboard, watchAlertKeyboard } from "@/lib/telegram/keyboards";
-import type { JudgeReport, Side, WatchRow } from "@/lib/types";
+import type { ConfirmationBlob, JudgeReport, Side, WatchRow } from "@/lib/types";
+import {
+  confirmationBlobFromReport,
+  crossedConfirmation,
+  markConfirmed,
+  storedConfirmation,
+} from "./confirmation";
 import { scorePaper } from "./paper";
 import { runDebate, shouldRewriteJudge } from "./debate";
-import { alertInvalidationPrice, storedInvalidationPrice, watchCrossed } from "./watch-eval";
+import { alertInvalidationPrice, storedInvalidationPrice, watchCrossed, watchDirection } from "./watch-eval";
 
 export interface CheckResult {
   id: string;
@@ -21,6 +27,7 @@ export interface CheckResult {
   last: number;
   reason: string;
   evaluatedInv?: number | null;
+  confirmationState?: string;
 }
 
 function thesisSnapshotLast(watch: WatchRow): number | null {
@@ -33,32 +40,55 @@ async function lastPrice(symbol: string): Promise<number> {
   return (await scoutSymbol(symbol)).last;
 }
 
+function advanceConfirmation(opts: {
+  side: string | null;
+  last: number;
+  blob: ConfirmationBlob | null;
+}): { blob: ConfirmationBlob | null; newlyConfirmed: boolean } {
+  if (!opts.blob) return { blob: null, newlyConfirmed: false };
+  if (opts.blob.state === "confirmed") return { blob: opts.blob, newlyConfirmed: false };
+  if (crossedConfirmation(opts.side, opts.last, opts.blob.price)) {
+    return { blob: markConfirmed(opts.blob), newlyConfirmed: true };
+  }
+  return { blob: opts.blob, newlyConfirmed: false };
+}
+
 export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Promise<CheckResult> {
   const snap = await scoutSymbol(watch.symbol);
   const storedInv = storedInvalidationPrice(watch);
   const crossed = watchCrossed(watch, snap.last);
   const move = moveVsSnapshotPct(snap.last, thesisSnapshotLast(watch));
   const rewrite = shouldRewriteJudge({ force: forceRewrite, crossed, moveAbsPct: move });
+  const dir = watchDirection(watch);
 
   if (!rewrite) {
-    await updateWatchSnapshot(watch.id, { last_price: snap.last });
+    const next = advanceConfirmation({
+      side: dir,
+      last: snap.last,
+      blob: storedConfirmation(watch),
+    });
+    await updateWatchSnapshot(watch.id, {
+      last_price: snap.last,
+      ...(next.blob ? { confirmation: next.blob } : {}),
+    });
     return {
       id: watch.id,
       symbol: watch.symbol,
       chatId: watch.chat_id,
-      silent: true,
-      action: watch.last_action ?? "hold",
+      silent: !next.newlyConfirmed,
+      action: next.newlyConfirmed ? "confirmed" : watch.last_action ?? "hold",
       last: snap.last,
-      reason: "price_updated",
+      reason: next.newlyConfirmed ? "Thesis confirmation trigger printed." : "price_updated",
       evaluatedInv: storedInv,
+      confirmationState: next.blob?.state,
     };
   }
 
-  const side = (watch.side || watch.last_thesis?.bias || "decide") as Side;
+  const requestedSide = (watch.side || watch.last_thesis?.bias || "decide") as Side;
   const bundle = await runDebate({
     symbol: snap.symbol,
     horizon: watch.horizon,
-    side: side === "long" || side === "short" ? side : "decide",
+    side: requestedSide === "long" || requestedSide === "short" ? requestedSide : "decide",
     snapshot: snap,
     prior: watch.last_thesis ?? undefined,
     rewrite: true,
@@ -76,6 +106,14 @@ export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Prom
     rewrittenInv: report.invalidation_price,
   });
 
+  let confirmation = confirmationBlobFromReport(report, storedConfirmation(watch));
+  let newlyConfirmed = false;
+  if (!crossed) {
+    const next = advanceConfirmation({ side: dir, last: snap.last, blob: confirmation });
+    confirmation = next.blob ?? confirmation;
+    newlyConfirmed = next.newlyConfirmed;
+  }
+
   const active = action !== "call_off" && action !== "reject";
   await updateWatchSnapshot(watch.id, {
     last_price: snap.last,
@@ -87,45 +125,54 @@ export async function evaluateWatch(watch: WatchRow, forceRewrite = false): Prom
       note: report.invalidation_note,
       rules: report.i_am_wrong_if,
     },
+    confirmation,
     active,
   });
 
-  const shouldAlert = action !== (watch.last_action ?? "") || drop >= 15 || action === "call_off" || crossed;
+  const shouldAlert =
+    action !== (watch.last_action ?? "") || drop >= 15 || action === "call_off" || crossed || newlyConfirmed;
 
   return {
     id: watch.id,
     symbol: watch.symbol,
     chatId: watch.chat_id,
     silent: !shouldAlert,
-    action,
+    action: crossed ? action : newlyConfirmed ? "confirmed" : action,
     last: snap.last,
     evaluatedInv,
+    confirmationState: confirmation?.state,
     reason: crossed
       ? `Invalidation crossed at ${snap.last} vs ${storedInv}`
-      : drop >= 15
-        ? `Confidence dropped ${prevConf} → ${report.confidence}`
-        : report.reason || action,
+      : newlyConfirmed
+        ? "Thesis confirmation trigger printed."
+        : drop >= 15
+          ? `Confidence dropped ${prevConf} → ${report.confidence}`
+          : report.reason || action,
   };
 }
 
 export async function notifyCheck(watch: WatchRow, result: CheckResult, report?: JudgeReport | null): Promise<void> {
   if (result.silent) return;
-  await sendMessage(
-    result.chatId,
-    alertText({
-      symbol: result.symbol,
-      prevConf: watch.last_confidence,
-      nextConf: report?.confidence ?? watch.last_confidence ?? 0,
-      action: result.action,
-      last: result.last,
-      inv:
-        result.evaluatedInv !== undefined
-          ? result.evaluatedInv
-          : storedInvalidationPrice(watch),
-      reason: result.reason,
-    }),
-    { reply_markup: watchAlertKeyboard(watch.id) },
-  );
+  const text =
+    result.action === "confirmed"
+      ? confirmationAlertText({
+          symbol: result.symbol,
+          last: result.last,
+          trigger: storedConfirmation(watch)?.trigger ?? report?.confirmation_trigger ?? "",
+        })
+      : alertText({
+          symbol: result.symbol,
+          prevConf: watch.last_confidence,
+          nextConf: report?.confidence ?? watch.last_confidence ?? 0,
+          action: result.action,
+          last: result.last,
+          inv:
+            result.evaluatedInv !== undefined
+              ? result.evaluatedInv
+              : storedInvalidationPrice(watch),
+          reason: result.reason,
+        });
+  await sendMessage(result.chatId, text, { reply_markup: watchAlertKeyboard(watch.id) });
 }
 
 async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
@@ -136,6 +183,11 @@ async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
       const last = await lastPrice(run.symbol);
       const scored = scorePaper(run, last);
       const closed = scored.status !== "open";
+      const blob = storedConfirmation(run);
+      const advanced = closed
+        ? { blob, newlyConfirmed: false }
+        : advanceConfirmation({ side: run.side, last, blob });
+      const nextConf = advanced.blob;
       if (closed) {
         await settlePaperClose({
           id: run.id,
@@ -146,15 +198,17 @@ async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
           pnlUsdt: scored.pnl_usdt,
           closeReason: scored.close_reason,
         });
+        if (nextConf) await updatePaperRun(run.id, { confirmation: nextConf });
       } else {
         await updatePaperRun(run.id, {
           last_price: last,
           pnl_pct: scored.pnl_pct,
           pnl_usdt: scored.pnl_usdt,
           liquidation_price: scored.liq_price,
+          ...(nextConf ? { confirmation: nextConf } : {}),
         });
       }
-      const silent = !closed;
+      const silent = !closed && !advanced.newlyConfirmed;
       if (!silent) {
         const fresh = {
           ...run,
@@ -165,6 +219,7 @@ async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
           close_reason: scored.close_reason,
           liquidation_price: scored.liq_price,
           liq_price: scored.liq_price,
+          confirmation: nextConf,
         };
         await sendMessage(run.chat_id, paperCard(fresh), { reply_markup: paperKeyboard(run.id) });
       }
@@ -173,9 +228,10 @@ async function scoreOpenPaper(chatId?: number): Promise<CheckResult[]> {
         symbol: run.symbol,
         chatId: run.chat_id,
         silent,
-        action: scored.status,
+        action: closed ? scored.status : advanced.newlyConfirmed ? "confirmed" : scored.status,
         last,
-        reason: scored.close_reason ?? "paper_scored",
+        confirmationState: nextConf?.state,
+        reason: scored.close_reason ?? (advanced.newlyConfirmed ? "Thesis confirmation trigger printed." : "paper_scored"),
       });
     } catch (err) {
       console.error("[check] paper failed", run.id, err);

@@ -2,9 +2,9 @@
 
 Adversarial AI trading desk for **Bitget tokenized US names / USDT markets**.
 
-Rook builds a thesis, attacks it, writes a hard invalidation price, watches the market, and can freeze a **paper** call when you press CALL LIVE. It never places a Bitget order.
+Rook builds a thesis, attacks it, writes what would prove it wrong and what would prove it right, watches the market, and can freeze a **paper** call when you press CALL LIVE. It never places a Bitget order.
 
-**[@getrookbot](https://t.me/getrookbot)** — Bitget AI Base Camp Hackathon S2 · track **AI Trading Desk** (Personalized Research Workbench / Decision Stress Testing).
+**[getrookbot](https://t.me/getrookbot)** — adversarial trading desk for crypto markets.
 
 Not financial advice. Paper P&L is a simulation against public last, not live trading performance.
 
@@ -12,8 +12,8 @@ Not financial advice. Paper P&L is a simulation against public last, not live tr
 
 1. Scout a Bitget public ticker (last, 24h, realized vol, SMA20). Bare `NVDA` → `NVDAUSDT`, then `RNVDAUSDT` if needed.
 2. Pull headline notes from bitget-signal (public MCP). Empty or failed notes become `no external headlines available`. No invented sources.
-3. Debate bull vs bear, then Judge writes JSON: bias, confidence, evidence, strategy, invalidation price, action.
-4. WATCH THIS stores the thesis. CHECK NOW / the external scheduler re-reads price against the **stored** invalidation first.
+3. Debate bull vs bear, then Judge writes JSON: bias, confidence, evidence, strategy, invalidation, confirmation.
+4. WATCH THIS stores the thesis. CHECK NOW / the external scheduler re-reads price against the **stored** invalidation first. Confirmation is marked when its trigger prints; it does not close paper.
 5. CALL LIVE is user-triggered. LONG or SHORT bias opens that paper side. NONE asks you to pick before any row is inserted.
 6. MY PAPER is the open book (max 10). STOP PAPER or a crossed invalidation price moves the call to RECORDS.
 
@@ -92,26 +92,13 @@ Each pass:
 
 No second poller.
 
-## CrewAI
+## Debate
 
-CrewAI is the intended reasoning engine when `CREW_ENABLED=true` and Python can spawn:
-
-```text
-News → Bull → Bear → Judge   (sequential, no delegation)
-```
-
-`lib/desk/debate.ts` tries that first. If the spawn is missing (typical Vercel Hobby), the same Judge schema runs on Groq TypeScript with the same signal notes. Production does not import the `crewai` package.
-
-```bash
-cd crew
-bash setup.sh
-source .venv/bin/activate
-python crew.py BTCUSDT 7d decide
-```
+Bull / Bear run on Groq org A. Judge runs on Groq org B.
 
 ## Setup
 
-Apply `supabase/migrations/` in order (`001`, `002`, `003`). Copy `.env.example` — never commit a real `.env`.
+Apply `supabase/migrations/` in order (`001`–`007`). Copy `.env.example` — never commit a real `.env`.
 
 ```bash
 npm install
@@ -125,7 +112,7 @@ Health: `GET /api/health`. Webhook routes use the Node runtime (`maxDuration = 6
 
 Required: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY_A`, `GROQ_API_KEY_B`, `CRON_SECRET`.
 
-Optional: `GROQ_MODEL_A`, `GROQ_MODEL_B`, `BITGET_BASE`, `BITGET_SIGNAL_MCP`, `CREW_ENABLED`, `CREW_PYTHON`, `CREW_SCRIPT`.
+Optional: `GROQ_MODEL_A`, `GROQ_MODEL_B`, `BITGET_BASE`, `BITGET_SIGNAL_MCP`, `NEXT_PUBLIC_SITE_URL`.
 
 RLS denies `anon` and `authenticated`. Only the service role is used on the server.
 
@@ -145,7 +132,7 @@ External scheduler every 15 minutes:
 
 ## Stack
 
-Next.js 15 App Router, TypeScript, Vercel, Supabase Postgres, Groq (org A 20b / org B 120b), Bitget public REST, optional CrewAI + bitget-signal MCP, Vitest.
+Next.js 15 App Router, TypeScript, Vercel, Supabase Postgres, Groq org A 20b / Groq org B 120b, Bitget public REST, bitget-signal MCP, Vitest.
 
 ## License
 

@@ -14,7 +14,7 @@ Be specific, adversarial, and concise (120-180 words each).
 No order instructions. Not financial advice.`;
 
 export const JUDGE_SYSTEM = `You are Rook Judge, the adversarial desk head.
-Stress-test the thesis. Write explicit invalidation. Never place an order.
+Stress-test the thesis. Write explicit invalidation AND confirmation. Never place an order.
 Always return a single JSON object. No markdown outside the JSON.
 
 bias is your analytical lean: long, short, or none.
@@ -36,6 +36,16 @@ LONG: price must be BELOW snapshot last (adverse drop).
 SHORT: price must be ABOVE snapshot last (adverse rise). Prefer 24h high / a clear resistance print.
 i_am_wrong_if may list volume spikes, news, or order-flow warnings. Those are NOT automatic close conditions.
 invalidation_note must describe the same price and the same side (short = at or above; long = at or below).
+
+confirmation is the complementary half of the thesis: a still-future price that would prove the argument right.
+confirmation_price is optional. Include it ONLY when a still-future deterministic print can be named from the snapshot.
+LONG confirmation_price must be ABOVE snapshot last. SHORT confirmation_price must be BELOW snapshot last.
+If last has already printed through a level, do not use that level as confirmation.
+If the snapshot cannot support a defensible future confirmation price, set confirmation_price to null and leave confirmation_trigger and confirmation_note empty.
+Do not invent a number to fill the field. Do not write a text-only confirmation. Confirmation is not a take-profit and not an exit.
+confirmation_trigger must describe that same price (long = at or above; short = at or below) when a price is set.
+confirmation_note is "I'm right if…" for that price.
+
 action must be one of: watch | reject | call_off | hold.
 If evidence is thin, lower evidence_quality and lean reject or hold.`;
 
@@ -81,9 +91,11 @@ export function judgeUser(opts: {
     opts.bullBear,
     opts.prior ? `Prior thesis:\n${opts.prior}` : "",
     `Write strategy as thesis conditions (strengthen / weaken / missing evidence), not order instructions.`,
+    `Also write confirmation_price when a still-future print would prove the thesis right, plus "I'm right if". Not a take-profit.`,
+    `If no still-future confirmation print is defensible from this snapshot, set confirmation_price null and leave confirmation_trigger empty.`,
     `confidence = support for the lean. evidence_quality = quality of the evidence. Both 0-100 model scores, not probabilities.`,
     `Return ONLY this JSON:`,
-    `{\n  "symbol": "${opts.symbol}",\n  "horizon": "${opts.horizon}",\n  "bias": "long | short | none",\n  "confidence": 0,\n  "strategy": "2-5 sentences",\n  "bull_summary": "",\n  "bear_summary": "",\n  "catalysts": [],\n  "risks": [],\n  "i_am_wrong_if": [],\n  "invalidation_price": null,\n  "invalidation_note": "",\n  "action": "watch | reject | call_off | hold",\n  "reason": "",\n  "evidence_quality": 0\n}`,
+    `{\n  "symbol": "${opts.symbol}",\n  "horizon": "${opts.horizon}",\n  "bias": "long | short | none",\n  "confidence": 0,\n  "strategy": "2-5 sentences",\n  "bull_summary": "",\n  "bear_summary": "",\n  "catalysts": [],\n  "risks": [],\n  "i_am_wrong_if": [],\n  "invalidation_price": null,\n  "invalidation_note": "",\n  "confirmation_price": null,\n  "confirmation_trigger": "",\n  "confirmation_note": "",\n  "action": "watch | reject | call_off | hold",\n  "reason": "",\n  "evidence_quality": 0\n}`,
   ]
     .filter(Boolean)
     .join("\n");

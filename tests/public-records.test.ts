@@ -103,5 +103,24 @@ describe("public receipt uses stored thesis", () => {
     const card = toPublicCard(run());
     expect(card.symbol).toBe("BTCUSDT");
     expect(card.status).toBe("STOPPED");
+    expect(rec.confirmationTrigger).toBeNull();
+    expect(rec.confirmationState).toBeNull();
+  });
+
+  it("surfaces stored confirmation when present and stays quiet when absent", () => {
+    const rec = toPublicReceipt(
+      run({
+        confirmation: {
+          trigger: "Price trades at or above 85000.",
+          i_am_right_if: "Acceptance holds above the range.",
+          price: 85000,
+          state: "confirmed",
+        },
+      }),
+    );
+    expect(rec.confirmationTrigger).toMatch(/85000/);
+    expect(rec.confirmationNote).toMatch(/Acceptance/);
+    expect(rec.confirmationState).toBe("confirmed");
+    expect(rec.status).toBe("STOPPED");
   });
 });

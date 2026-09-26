@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Rook — adversarial AI trading desk",
+  title: "Rook — adversarial trading desk",
   description:
-    "Rook is an AI trading desk that doesn't just build a thesis — it tries to destroy it before you put money behind it.",
+    "An adversarial trading desk for crypto markets. Build a thesis. Stress-test it. Define what proves it wrong. Define what proves it right.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

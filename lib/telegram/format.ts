@@ -1,8 +1,9 @@
-import { DISCLAIMER, type JudgeReport, type MarketSnapshot, type WatchRow } from "@/lib/types";
+import { DISCLAIMER, type ConfirmationBlob, type JudgeReport, type MarketSnapshot, type WatchRow } from "@/lib/types";
 import { distancePct } from "@/lib/bitget/scout";
+import { storedConfirmation } from "@/lib/desk/confirmation";
 
 export function esc(s: string): string {
-  return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function heading(title: string): string {
@@ -27,7 +28,7 @@ export function metadata(text: string): string {
 
 function bullets(items: string[], empty = "\u2014"): string {
   if (!items.length) return empty;
-  return items.map((x) => `• ${esc(x)}`).join("\n");
+  return items.map((x) => `\u2022 ${esc(x)}`).join("\n");
 }
 
 export function fmtNum(n: number | null | undefined, digits = 4): string {
@@ -53,13 +54,20 @@ export function fmtPct(n: number | null | undefined): string {
   return `${sign}${n.toFixed(2)}%`;
 }
 
-export function invRelationLabel(last: number, inv: number | null | undefined): string {
-  if (inv == null || !Number.isFinite(inv) || !Number.isFinite(last) || last === 0) return "n/a";
-  const d = distancePct(last, inv);
+export function levelVsLastLabel(last: number, level: number | null | undefined): string {
+  if (level == null || !Number.isFinite(level) || !Number.isFinite(last) || last === 0) return "n/a";
+  const d = distancePct(last, level);
   if (d == null) return "n/a";
-  if (Math.abs(d) < 0.005) return "at invalidation";
+  if (Math.abs(d) < 0.005) return "at last";
   const abs = Math.abs(d).toFixed(2);
-  return last > inv ? `invalidation ${abs}% below last` : `invalidation ${abs}% above last`;
+  return last > level ? `${abs}% below last` : `${abs}% above last`;
+}
+
+export function invRelationLabel(last: number, inv: number | null | undefined): string {
+  const rel = levelVsLastLabel(last, inv);
+  if (rel === "n/a") return "n/a";
+  if (rel === "at last") return "at invalidation";
+  return `invalidation ${rel}`;
 }
 
 export function footer(): string {
@@ -68,9 +76,12 @@ export function footer(): string {
 
 export function welcomeText(): string {
   return [
-    `${heading("ROOK")} — adversarial desk for Bitget tokenized US names / USDT markets.`,
+    `${heading("ROOK")} — an adversarial trading desk for crypto markets.`,
     "",
-    "I build a thesis, attack it, write explicit invalidation, then watch after hours.",
+    "I build a thesis, attack it, then write the pair that makes the argument honest:",
+    "INVALIDATION — I'm wrong if…",
+    "CONFIRMATION — I'm right if…",
+    "",
     "I <b>never</b> place an order. You call it off.",
     "",
     "Use the keyboard. Slash commands only redraw it.",
@@ -82,15 +93,15 @@ export function helpText(): string {
   return [
     heading("HOW ROOK WORKS"),
     "1. NEW THESIS → horizon → side → market",
-    "2. Scout pulls live Bitget public numbers (no LLM prices)",
-    "3. Bull and Bear argue. Judge writes the thesis and a hard invalidation price",
-    "4. WATCH THIS monitors the thesis. CALL LIVE opens a directional paper call",
+    "2. Scout pulls live public numbers (no LLM prices)",
+    "3. Bull and Bear argue. Judge writes strategy, invalidation, and confirmation",
+    "4. WATCH THIS monitors both lines. CALL LIVE opens a directional paper call",
     "5. MY PAPER is open calls (max 10). RECORDS is stopped, invalidated, and liquidated calls",
-    "6. Open watches are checked every 15 minutes. If the stored invalidation price is crossed I tell you. I never place a Bitget order",
+    "6. Open watches are checked every 15 minutes. Invalidation can call the thesis off. Confirmation does not close a paper call",
     "",
-    `${heading("Bitget AI Base Camp S2")} — track: AI Trading Desk (research workbench / decision stress testing). No execution.`,
+    "INVALIDATION is what proves the argument wrong. CONFIRMATION is what proves it right. Confirmation is not a take-profit.",
     "",
-    "Bare tickers like NVDA map to NVDAUSDT, then RNVDAUSDT (Bitget rToken style) if needed.",
+    "Bare tickers like NVDA map to NVDAUSDT, then RNVDAUSDT if needed.",
     footer(),
   ].join("\n");
 }
@@ -106,13 +117,48 @@ export function snapshotLine(s: MarketSnapshot): string {
   ].join("\n");
 }
 
-export function thesisCard(report: JudgeReport, snapshot?: MarketSnapshot, prevConf?: number | null): string {
+function confirmationBlock(
+  report: JudgeReport,
+  last: number | null,
+  stored?: ConfirmationBlob | null,
+): string[] {
+  const blob = stored ?? storedConfirmation({ thesis: report });
+  const confPrice = blob?.price ?? report.confirmation_price ?? null;
+  const trigger = blob?.trigger || report.confirmation_trigger || "";
+  const rightIf = blob?.i_am_right_if || report.confirmation_note || "";
+  const state = blob?.state ?? "none";
+  const rel = last != null ? levelVsLastLabel(Number(last), confPrice) : "";
+  const head =
+    confPrice != null
+      ? `${price(confPrice)}${rel && rel !== "n/a" ? ` · ${esc(rel)}` : ""}`
+      : emphasis("No confirmation");
+  const stateLine =
+    state === "confirmed"
+      ? emphasis("CONFIRMED")
+      : confPrice != null
+        ? metadata("Still developing")
+        : "";
+  return [
+    heading("CONFIRMATION"),
+    head,
+    stateLine,
+    trigger ? `${heading("Trigger")}\n${esc(trigger)}` : "",
+    rightIf ? `I'm right if\n${esc(rightIf)}` : "",
+  ].filter((l) => l !== "");
+}
+
+export function thesisCard(
+  report: JudgeReport,
+  snapshot?: MarketSnapshot,
+  prevConf?: number | null,
+  storedConfirmationBlob?: ConfirmationBlob | null,
+): string {
   const conf =
     prevConf !== null && prevConf !== undefined && prevConf !== report.confidence
       ? `${prevConf} → ${report.confidence}`
       : String(report.confidence);
   const last = snapshot?.last ?? null;
-  const invRel = last != null ? invRelationLabel(Number(last), report.invalidation_price) : "";
+  const invRel = last != null ? levelVsLastLabel(Number(last), report.invalidation_price) : "";
   const lines = [
     heading("ROOK REPORT"),
     `${instrument(report.symbol)} · ${esc(report.horizon)}`,
@@ -127,7 +173,10 @@ export function thesisCard(report: JudgeReport, snapshot?: MarketSnapshot, prevC
     "",
     heading("INVALIDATION"),
     `${price(report.invalidation_price)}${invRel && invRel !== "n/a" ? ` · ${esc(invRel)}` : ""}`,
-    esc(report.invalidation_note || "—"),
+    report.invalidation_price != null ? `${heading("Trigger")}\nPrice trades at the invalidation print.` : "",
+    `I'm wrong if\n${esc(report.invalidation_note || "—")}`,
+    "",
+    ...confirmationBlock(report, last, storedConfirmationBlob),
     "",
     heading("WHY"),
     esc(report.reason || "—"),
@@ -148,6 +197,10 @@ export function wrongCard(report: JudgeReport): string {
     `${heading("I AM WRONG IF")} — ${instrument(report.symbol)}`,
     `Deterministic close ${price(report.invalidation_price)}`,
     esc(report.invalidation_note || ""),
+    "",
+    heading("I AM RIGHT IF"),
+    report.confirmation_price != null ? `Confirmation print ${price(report.confirmation_price)}` : emphasis("No confirmation"),
+    esc(report.confirmation_note || (report.confirmation_price != null ? report.confirmation_trigger : "") || "No confirmation stored on this thesis."),
     "",
     heading("WARNING SIGNS"),
     bullets(report.i_am_wrong_if),
@@ -171,6 +224,11 @@ export function watchesText(rows: WatchRow[]): string {
         `${i + 1}. ${instrument(w.symbol)} · ${esc(w.horizon)} · ${esc(String(w.side))}`,
         `Confidence ${w.last_confidence ?? "?"} · Action ${esc(w.last_action ?? "?")} · Last ${fmtNum(last)}`,
         `Invalidation ${fmtNum(inv)} · ${invRelationLabel(last, inv)}`,
+        w.confirmation?.state === "confirmed"
+          ? "Confirmation CONFIRMED"
+          : w.confirmation?.price != null
+            ? "Confirmation still developing"
+            : "",
       ].join("\n");
     })
     .join("\n\n");
@@ -182,6 +240,16 @@ export function settingsText(alertsOn: boolean): string {
     heading("SETTINGS"),
     `Alerts: ${emphasis(alertsOn ? "ON" : "OFF")}`,
     "Open watches and paper calls are checked automatically every 15 minutes.",
+    footer(),
+  ].join("\n");
+}
+
+export function confirmationAlertText(opts: { symbol: string; last: number; trigger: string }): string {
+  return [
+    `${heading("THESIS CONFIRMED")} — ${instrument(opts.symbol)}`,
+    `Last ${fmtNum(opts.last)}`,
+    opts.trigger ? esc(opts.trigger) : "The stored confirmation trigger printed.",
+    metadata("Confirmation is not an exit. The paper call stays open until you stop it or invalidation hits."),
     footer(),
   ].join("\n");
 }

@@ -2,6 +2,7 @@ import type { DebateBundle, Horizon, JudgeReport, MarketSnapshot, Side } from "@
 import { collectSignalBrief } from "@/lib/bitget/signal";
 import { scoutSymbol } from "@/lib/bitget/scout";
 import { groqComplete } from "./groq";
+import { applyConfirmation } from "./confirmation";
 import { applyAuthoritativeInvalidation } from "./invalidation";
 import { parseJudgeReport } from "./judge";
 import { BULL_BEAR_SYSTEM, JUDGE_SYSTEM, NEWS_SYSTEM, bullBearUser, judgeUser, newsUser } from "./prompts";
@@ -58,8 +59,11 @@ export async function runDebate(opts: {
     }),
     temperature: 0.15,
   });
-  const report = applyAuthoritativeInvalidation(
-    parseJudgeReport(judgeText, snapshot.symbol, opts.horizon),
+  const report = applyConfirmation(
+    applyAuthoritativeInvalidation(
+      parseJudgeReport(judgeText, snapshot.symbol, opts.horizon),
+      snapshot,
+    ),
     snapshot,
   );
   report.symbol = snapshot.symbol;

@@ -1,5 +1,6 @@
 import { crossedInvalidation } from "@/lib/bitget/scout";
 import type { WatchRow } from "@/lib/types";
+import { crossedConfirmation, storedConfirmationPrice } from "./confirmation";
 import { isPaperDir } from "./paper";
 
 export function storedInvalidationPrice(watch: WatchRow): number | null {
@@ -25,6 +26,12 @@ export function watchCrossed(watch: WatchRow, last: number): boolean {
   const dir = watchDirection(watch);
   if (!dir) return false;
   return crossedInvalidation(dir, last, storedInvalidationPrice(watch));
+}
+
+export function watchConfirmationCrossed(watch: WatchRow, last: number): boolean {
+  const dir = watchDirection(watch);
+  if (!dir) return false;
+  return crossedConfirmation(dir, last, storedConfirmationPrice(watch));
 }
 
 /** Alert must show the inv that was evaluated — never mix stored vs rewritten. */

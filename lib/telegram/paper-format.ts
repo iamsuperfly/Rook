@@ -9,7 +9,8 @@ import {
   paperRiskState,
 } from "@/lib/desk/paper-sim";
 import type { PaperRunRow } from "@/lib/types";
-import { emphasis, esc, fmtNum, fmtPct, fmtUtc, heading, instrument, invRelationLabel, metadata, price } from "./format";
+import { storedConfirmation } from "@/lib/desk/confirmation";
+import { emphasis, esc, fmtNum, fmtPct, fmtUtc, heading, instrument, invRelationLabel, levelVsLastLabel, metadata, price } from "./format";
 
 export const PAPER_DISCLAIMER = "Paper simulation \u00b7 No real orders placed";
 
@@ -113,6 +114,21 @@ export function paperCard(run: PaperRunRow): string {
       Number.isFinite(last) && inv != null ? ` \u00b7 ${esc(invRelationLabel(last, inv))}` : ""
     }`,
     note ? esc(note) : "",
+    (() => {
+      const conf = storedConfirmation(run);
+      if (!conf) return "";
+      const rel = conf.price != null ? levelVsLastLabel(last, conf.price) : "";
+      const state =
+        conf.state === "confirmed" ? "CONFIRMED" : "Still developing";
+      return [
+        `${heading("CONFIRMATION")} \u00b7 ${emphasis(state)}`,
+        conf.price != null ? `${price(conf.price)}${rel && rel !== "n/a" ? ` \u00b7 ${esc(rel)}` : ""}` : "",
+        conf.trigger ? `Trigger\n${esc(conf.trigger)}` : "",
+        conf.i_am_right_if ? `I'm right if\n${esc(conf.i_am_right_if)}` : "",
+      ]
+        .filter((l) => l !== "")
+        .join("\n");
+    })(),
     run.opened_at ? metadata(`Opened ${fmtUtc(run.opened_at)}`) : "",
     run.closed_at ? metadata(`Closed ${fmtUtc(run.closed_at)}`) : "",
     "",
@@ -159,7 +175,10 @@ export function paperListText(
   return [heading("MY PAPER"), "", ...walletLines, `Open ${emphasis(`${n}/${MAX_OPEN_PAPER}`)}`, "", body].join("\n");
 }
 
-export function recordsListText(closedRows: PaperRunRow[]): string {
+export function recordsListText(
+  closedRows: PaperRunRow[],
+  opts?: { seeMoreUrl?: string | null },
+): string {
   const rows = closedRows.filter((r) => r.status !== "open");
   const stats = recordsStats(rows);
   if (!rows.length) {
@@ -193,7 +212,10 @@ export function recordsListText(closedRows: PaperRunRow[]): string {
     heading("RECENT"),
     "",
     recent.join("\n\n"),
-  ].join("\n");
+    opts?.seeMoreUrl ? `\nSEE MORE \u2192\n${esc(opts.seeMoreUrl)}` : "",
+  ]
+    .filter((l) => l !== "")
+    .join("\n");
 }
 
 export function walletText(view: {

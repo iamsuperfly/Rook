@@ -4,11 +4,11 @@ import type { JudgeReport, MarketSnapshot, WatchRow } from "@/lib/types";
 
 describe("esc", () => {
   it("escapes HTML special characters", () => {
-    expect(esc(`A & B <C> \"quote\"`)).toBe("A & B <C> \"quote\"");
+    expect(esc(`A & B <C> "quote"`)).toBe("A &amp; B &lt;C&gt; \"quote\"");
   });
 
   it("escapes ampersand first so entities stay intact", () => {
-    expect(esc("<Rook & Co>")).toBe("<Rook & Co>");
+    expect(esc("<Rook & Co>")).toBe("&lt;Rook &amp; Co&gt;");
   });
 });
 
@@ -69,7 +69,9 @@ describe("snapshot and report typography", () => {
     expect(html).not.toMatch(/\bconf\b/);
     expect(html).not.toMatch(/\bevq\b/);
     expect(html).not.toMatch(/\bdist\b/);
-    expect(html).toMatch(/invalidation .+ (above|below) last|at invalidation/);
+    expect(html).toMatch(/above last|below last|at last|at invalidation/);
+    expect(html).toContain("CONFIRMATION");
+    expect(html).toMatch(/I'?m wrong if|I'm wrong if/);
   });
 });
 
