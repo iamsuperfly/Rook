@@ -60,10 +60,33 @@ a { color: inherit; }
 .rook-empty { border: 1px dashed var(--line); padding: 24px; color: var(--muted); }
 .rook-foot { margin-top: 48px; color: var(--muted); font-size: 13px; }
 
+.rook-home { max-width: 760px; margin: 0 auto; padding: 28px 24px 96px; }
+.rook-home-nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 48px; }
+.rook-home-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; letter-spacing: 0.22em; font-weight: 700; color: var(--accent); }
+.rook-home-logo, .rook-home-logo-sm { display: block; object-fit: contain; }
+.rook-home-logo { margin: 0 auto 20px; }
+.rook-home-hero { text-align: center; padding-bottom: 40px; }
+.rook-home-hero h1 { font-size: 40px; line-height: 1.1; margin: 12px auto 16px; max-width: 16ch; }
+.rook-home-lead { font-size: 20px; color: #cfc6b0; max-width: 28em; margin: 0 auto 16px; }
+.rook-home-cta { background: var(--accent); color: #111; padding: 10px 16px; text-decoration: none; font-weight: 700; }
+.rook-home-cta-lg { display: inline-block; margin-top: 24px; padding: 12px 20px; }
+.rook-home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 12px 0 40px; }
+.rook-home-grid article { border: 1px solid var(--line); padding: 18px 16px; }
+.rook-home-grid h2, .rook-home-loop h2, .rook-home-note h2 { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.rook-home-grid p, .rook-home-loop li, .rook-home-note p { color: #cfc6b0; line-height: 1.55; margin: 0; }
+.rook-home-loop ol { margin: 0; padding-left: 18px; }
+.rook-home-loop li + li { margin-top: 8px; }
+.rook-home-note { margin-top: 36px; }
+.rook-home-note p + p { margin-top: 10px; }
+
 @media (max-width: 560px) {
   .rook-page { padding: 28px 16px 72px; }
   .rook-profile h1, .rook-page h1 { font-size: 22px; }
   .rook-stats { grid-template-columns: repeat(2, 1fr); }
   .rook-facts { grid-template-columns: 1fr; }
   .rook-row-top, .rook-row-sub { flex-direction: column; gap: 4px; }
+  .rook-home { padding: 20px 16px 72px; }
+  .rook-home-hero h1 { font-size: 28px; }
+  .rook-home-lead { font-size: 17px; }
+  .rook-home-grid { grid-template-columns: 1fr; }
 }
