@@ -1,6 +1,7 @@
 import { isPaperDir, leveragedPaper, recordsStats } from "@/lib/desk/paper";
 import { displayPnlUsdt } from "@/lib/telegram/paper-format";
-import { fmtNum, fmtUtc, invRelationLabel } from "@/lib/telegram/format";
+import { storedConfirmation } from "@/lib/desk/confirmation";
+import { fmtNum, fmtUtc, invRelationLabel, levelVsLastLabel } from "@/lib/telegram/format";
 import type { PaperRunRow } from "@/lib/types";
 
 export function sideLabel(side: string): string {
@@ -87,6 +88,11 @@ export interface PublicReceiptView {
   invalidation: string;
   invRelation: string | null;
   invNote: string;
+  confirmationPrice: string | null;
+  confirmationRelation: string | null;
+  confirmationTrigger: string | null;
+  confirmationNote: string | null;
+  confirmationState: string | null;
   thesis: string;
   warningSigns: string[];
   closeReason: string;
@@ -105,6 +111,7 @@ export function toPublicReceipt(run: PaperRunRow): PublicReceiptView {
   const liq = rawLiq != null && Number.isFinite(Number(rawLiq)) ? Number(rawLiq) : null;
   const pnl = displayPnlUsdt(run);
   const leveraged = leveragedPaper(run);
+  const conf = storedConfirmation(run);
   return {
     symbol: run.symbol,
     side: sideLabel(run.side),
@@ -122,6 +129,11 @@ export function toPublicReceipt(run: PaperRunRow): PublicReceiptView {
     invalidation: fmtNum(inv),
     invRelation: inv != null && Number.isFinite(last) ? invRelationLabel(last, inv) : null,
     invNote: note,
+    confirmationPrice: conf?.price != null ? fmtNum(conf.price) : null,
+    confirmationRelation: conf?.price != null ? levelVsLastLabel(last, conf.price) : null,
+    confirmationTrigger: conf?.price != null ? conf.trigger : null,
+    confirmationNote: conf?.price != null ? conf.i_am_right_if : null,
+    confirmationState: conf?.state ?? null,
     thesis: thesisLine,
     warningSigns: rules,
     closeReason: closeWhy(run),
