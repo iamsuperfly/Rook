@@ -6,6 +6,7 @@ import {
   liquidationPrice,
   paperExposure,
 } from "@/lib/desk/paper-sim";
+import { applyConfirmation, confirmationBlobFromReport } from "@/lib/desk/confirmation";
 import { applyAuthoritativeInvalidation, paperInvalidationBlob } from "@/lib/desk/invalidation";
 import { PaperFundsError, creditAvailable, debitAvailable } from "./paper-wallet";
 import { getServiceDb } from "./supabase";
@@ -62,8 +63,13 @@ export async function openPaperRun(opts: {
   await debitAvailable(opts.chatId, opts.marginUsdt);
   const exposure = paperExposure(opts.marginUsdt, opts.leverage);
   const liq = liquidationPrice({ side: opts.side, entry: opts.entry, leverage: opts.leverage });
-  const report = applyAuthoritativeInvalidation(opts.report, { last: opts.entry }, opts.side as "long" | "short");
+  const report = applyConfirmation(
+    applyAuthoritativeInvalidation(opts.report, { last: opts.entry }, opts.side as "long" | "short"),
+    { last: opts.entry },
+    opts.side as "long" | "short",
+  );
   const inv: InvalidationBlob = paperInvalidationBlob(report);
+  const confirmation = confirmationBlobFromReport(report);
   const db = getServiceDb();
   const { data, error } = await db
     .from("paper_runs")
@@ -84,6 +90,7 @@ export async function openPaperRun(opts: {
       liquidation_price: liq,
       thesis: report,
       invalidation: inv,
+      confirmation,
     })
     .select("*")
     .single();
@@ -196,7 +203,7 @@ export async function updatePaperRun(
   patch: Partial<
     Pick<
       PaperRunRow,
-      "last_price" | "pnl_pct" | "pnl_usdt" | "status" | "close_reason" | "closed_at" | "margin_usdt" | "leverage" | "liquidation_price" | "liq_price"
+      "last_price" | "pnl_pct" | "pnl_usdt" | "status" | "close_reason" | "closed_at" | "margin_usdt" | "leverage" | "liquidation_price" | "liq_price" | "confirmation"
     >
   >,
 ): Promise<PaperRunRow> {
