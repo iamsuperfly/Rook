@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const migration003 = readFileSync(resolve(process.cwd(), "supabase/migrations/003_paper_records.sql"), "utf8");
 const migration004 = readFileSync(resolve(process.cwd(), "supabase/migrations/004_paper_open_limit_lock.sql"), "utf8");
 const migration005 = readFileSync(resolve(process.cwd(), "supabase/migrations/005_paper_wallet.sql"), "utf8");
+const migration007 = readFileSync(resolve(process.cwd(), "supabase/migrations/007_confirmation.sql"), "utf8");
 
 describe("paper open-limit migrations", () => {
   it("keeps the applied 003 migration unchanged and adds the missing lock in 004", () => {
@@ -38,6 +39,17 @@ describe("paper wallet migration 005", () => {
     expect(migration005).not.toContain("liq_price");
     expect(migration005).not.toContain("mmr");
     expect(migration005).not.toMatch(/drop table/i);
+    expect(migration005).not.toContain("enforce_paper_open_limit");
+  });
+});
+
+describe("confirmation migration 007", () => {
+  it("adds nullable confirmation json without rewriting earlier migrations", () => {
+    expect(migration007).toContain("add column if not exists confirmation jsonb");
+    expect(migration007).toContain("paper_runs");
+    expect(migration007).toContain("watches");
+    expect(migration007).not.toMatch(/drop table/i);
+    expect(migration007).not.toMatch(/drop column/i);
     expect(migration005).not.toContain("enforce_paper_open_limit");
   });
 });
