@@ -59,6 +59,7 @@ export default async function PublicReceiptPage({
       <ol className="rook-seq">
         <li>THESIS</li>
         <li>INVALIDATION</li>
+        <li>CONFIRMATION</li>
         <li>PAPER CALL</li>
         <li>OUTCOME</li>
       </ol>
@@ -136,6 +137,25 @@ export default async function PublicReceiptPage({
         {rec.invRelation ? ` · ${rec.invRelation}` : ""}
       </p>
       {rec.invNote ? <p className="rook-muted">{rec.invNote}</p> : null}
+
+      {rec.confirmationPrice ? (
+        <>
+          <h2>Confirmation</h2>
+          {rec.confirmationState === "confirmed" ? (
+            <p className="rook-badge rook-badge-open">CONFIRMED</p>
+          ) : (
+            <p className="rook-muted">Still developing</p>
+          )}
+          {rec.confirmationPrice ? (
+            <p className="rook-sym">
+              {rec.confirmationPrice}
+              {rec.confirmationRelation ? ` · ${rec.confirmationRelation}` : ""}
+            </p>
+          ) : null}
+          {rec.confirmationTrigger ? <p>{rec.confirmationTrigger}</p> : null}
+          {rec.confirmationNote ? <p className="rook-muted">I&apos;m right if {rec.confirmationNote}</p> : null}
+        </>
+      ) : null}
 
       {rec.warningSigns.length > 0 ? (
         <>
